@@ -1,0 +1,1586 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>伸臂強度計算書</title>
+<script src="../shared/case-bridge.js?v=20261010y"></script>
+<script src="boom-geo.js?v=20261011f"></script>
+<script src="boom-db.js?v=20261011b"></script>
+<style>
+:root{
+  --ink:#1b2430; --muted:#5b6675; --line:#d5dbe3; --line2:#e8ecf1; --bg:#f3f5f8; --card:#fff;
+  --accent:#1f5fa8; --accent-bg:#e8f0fa; --ok:#1d7a46; --ok-bg:#e6f4ec; --ng:#c0392b; --ng-bg:#fbeaea;
+  --steel:#34404f; --in-bg:#fff6cf; --in-bd:#e2c45c; --dbl:#7a8aa0; --cl:#c0392b; --dim:#1f5fa8;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 "Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif}
+input[type=number],td.n{font-variant-numeric:tabular-nums}
+#app>header{background:#14263d;color:#fff;padding:14px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+#app>header h1{margin:0;font-size:20px;letter-spacing:.05em}
+.sub{font-size:12px;opacity:.75}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-size:13px;padding:5px 12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:5px;cursor:pointer}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+#app>header button{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.3)}
+#app>header button:hover{background:rgba(255,255,255,.18);border-color:#fff}
+button.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.pri:hover{color:#fff;opacity:.9}
+button.sm{padding:1px 8px;font-size:12px}
+button.del{color:var(--ng)}
+nav{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);display:flex;overflow-x:auto}
+nav a{padding:11px 18px;color:var(--muted);text-decoration:none;white-space:nowrap;border-bottom:3px solid transparent;cursor:pointer}
+nav a.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+main{max-width:1500px;margin:0 auto;padding:18px 16px 60px}
+.panel{display:block;scroll-margin-top:52px;margin-bottom:26px}
+#step1,#step2{display:none}
+body.s1 #step1,body.s2 #step2{display:block}
+body.s1 .s2only{display:none!important}
+.steps{display:flex;align-items:center;gap:0}
+.steps a.st{font-weight:600}
+.steps a.st b{display:inline-block;background:var(--line);color:var(--muted);border-radius:10px;padding:0 8px;margin-right:6px;font-size:12px}
+.steps a.st.on b{background:var(--accent);color:#fff}
+nav a.sub2{font-size:13px;padding:11px 10px}
+.pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.pick .card{display:flex;flex-direction:column;gap:8px;margin:0}
+.pick .card h3{margin:0;font-size:17px}
+.pick .card .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:9px;background:var(--accent-bg);color:var(--accent);margin-right:4px}
+.pick .card .spec{font-size:13px;color:var(--muted)}
+.pick .card button.pri{align-self:flex-start;margin-top:auto}
+.src-banner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--accent-bg);border:1px solid #c5d8ef;border-radius:8px;padding:10px 14px;margin-bottom:16px}
+.src-banner b{color:var(--accent)}
+.lockmark{font-size:12px;color:var(--muted);font-weight:400;margin-left:8px}
+h2{font-size:18px;margin:4px 0 12px;padding-left:10px;border-left:4px solid var(--accent)}
+h3{font-size:15px;margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.note{color:var(--muted);font-size:12.5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px 18px}
+.f{display:flex;align-items:center;gap:8px}
+.f label{flex:1;min-width:7em;color:var(--muted);font-size:13px}
+.f .u{width:64px;color:var(--muted);font-size:12px}
+/* 下拉選單文字較長：該欄獨佔一列，選單不超出欄位 */
+.grid>.f:has(>select){grid-column:1/-1}
+.f:has(>select) label{flex:0 0 auto;width:13em}
+.f select{min-width:0;max-width:100%}
+input[type=number],input[type=text],select{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--in-bd);border-radius:4px;background:var(--in-bg);color:var(--ink)}
+input[type=number]:hover,input[type=text]:hover,select:hover{border-color:#c9a227}
+input[type=number]{width:92px;text-align:right}
+input:focus,select:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
+input:disabled{background:var(--line2);color:var(--muted)}
+.calc{color:var(--accent);font-weight:600}
+table{border-collapse:collapse}
+.tbl{width:100%;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:3px 7px;font-size:13px}
+th{background:#eef2f7;font-weight:600;white-space:nowrap}
+td.n{text-align:right;white-space:nowrap}
+td input[type=number]{width:78px}
+td input[type=text]{width:100%;min-width:150px}
+.legend{margin-left:auto;display:flex;gap:14px;align-items:center;padding:0 16px;font-size:12px;color:var(--muted);white-space:nowrap}
+.legend i{display:inline-block;width:22px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+td.na{background:repeating-linear-gradient(135deg,#fff 0 7px,#e3e7ec 7px 8px)}
+td.ng{background:var(--ng-bg);color:var(--ng);font-weight:700}
+td.grp{background:#f7f9fb;font-weight:600;text-align:center}
+td.ro{color:var(--accent)}
+.badge{display:inline-block;padding:1px 9px;border-radius:10px;font-size:12px;font-weight:700}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.ng{background:var(--ng-bg);color:var(--ng)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:none;border-radius:0;padding:7px 16px}
+.seg button.on{background:var(--accent);color:#fff}
+.shapes{display:flex;gap:10px;flex-wrap:wrap}
+.shape-btn{display:flex;align-items:center;gap:8px;padding:6px 14px;border:2px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
+.shape-btn.on{border-color:var(--accent);background:var(--accent-bg);color:var(--accent);font-weight:700}
+.secs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(640px,100%),1fr));gap:14px}
+.sec{display:grid;grid-template-columns:minmax(260px,1.15fr) 1fr;gap:12px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px}
+.sec .draw{border:1px solid var(--line2);border-radius:6px;background:#fff}
+.sec .draw svg{display:block;width:100%;height:auto}
+.sec h4{margin:0 0 6px;font-size:15px}
+.sec .inp .f{margin-bottom:3px}
+.sec .inp input[type=number]{width:76px}
+.props{margin-top:8px;width:100%}
+.props td{font-size:12px;padding:2px 6px}
+.err{color:var(--ng);font-weight:600;font-size:12.5px}
+.warn{color:#9a6200;font-size:12.5px}
+.stage{margin-bottom:16px}
+.stage-h{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-bottom:6px}
+.stage-h b{font-size:15px}
+.flex{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.verdict{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:16px;font-weight:700}
+.verdict.ok{background:var(--ok-bg);color:var(--ok);border:1px solid #b9dfc8}
+.verdict.ng{background:var(--ng-bg);color:var(--ng);border:1px solid #efc1bc}
+.bar{height:14px;background:var(--line2);border-radius:3px;position:relative;min-width:120px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.bar i.ng{background:var(--ng)}
+.formula{font-family:"Cambria Math","Times New Roman","Microsoft JhengHei",serif;font-size:14.5px;line-height:1.9}
+.formula .eq{padding:2px 0 2px 16px}
+.formula .r{color:var(--accent);font-weight:700}
+.formula h4{font-family:"Microsoft JhengHei",sans-serif;margin:14px 0 4px;font-size:14px;border-bottom:1px solid var(--line);padding-bottom:3px}
+.formula table{font-family:"Microsoft JhengHei",sans-serif}
+.geo-svg svg{display:block;width:100%;height:auto;max-height:200px}
+.lc-wrap{display:grid;grid-template-columns:minmax(0,auto) minmax(380px,1fr);gap:14px;align-items:start}
+@media (max-width:1100px){.lc-wrap{grid-template-columns:1fr}}
+.lc-side{position:sticky;top:58px}
+.lc{border-collapse:collapse;width:100%;color:#000}
+.lc th,.lc td{border:1px solid #222;text-align:center;padding:4px 6px;font-size:13px;line-height:1.25;background:#fff}
+.lc thead th{background:#fff;font-weight:700}
+.lc td.r{font-weight:700}
+.lc td.x{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cline x1='0' y1='0' x2='100' y2='100' stroke='%23333' stroke-width='1.4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center/100% 100% no-repeat}
+.lc td small{display:block;font-size:11px;font-weight:400}
+.lc .corner{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cline x1='0' y1='0' x2='100' y2='100' stroke='%23333' stroke-width='1.4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center/100% 100% no-repeat;position:relative;min-width:110px;height:58px;padding:0}
+.lc .corner span{position:absolute;font-size:12px;font-weight:600}
+.lc .corner .a{right:6px;top:4px}.lc .corner .b{left:6px;bottom:4px}
+.lc-title{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.lc-title b{font-size:20px;letter-spacing:.05em}
+@media (max-width:700px){.sec{grid-template-columns:1fr}.flex>.card{min-width:0!important}}
+
+/* ---------- 列印版（A4） ---------- */
+/* 申請案模式：主控台 S3 內嵌（embed）／申請文件檢視（doc） */
+body.embed #btnPreview,body.embed #btnPrint{display:none!important}
+body.doc #pvClose{display:none!important}
+.doc-empty{background:#fff;max-width:640px;margin:40px auto;padding:24px;border-radius:8px;font-size:15px;line-height:1.7}
+#print{display:none}
+body.preview #app{display:none}
+body.preview #print{display:block;padding:56px 0 40px;background:#8a929c}
+#pvbar{display:none}
+body.preview #pvbar{display:flex;position:fixed;top:0;left:0;right:0;z-index:9;background:#14263d;color:#fff;padding:9px 18px;gap:10px;align-items:center}
+.sheet{background:#fff;color:#000;width:210mm;margin:0 auto 14px;padding:12mm 12mm 14mm;box-shadow:0 2px 10px rgba(0,0,0,.35);font:10pt/1.5 "Microsoft JhengHei","PingFang TC",sans-serif}
+.sheet.land{width:297mm}
+.sheet .ph{display:flex;justify-content:space-between;border-bottom:1.5px solid #000;padding-bottom:2mm;margin-bottom:4mm;font-size:8.5pt}
+.sheet h1{font-size:15pt;text-align:center;margin:2mm 0 4mm}
+.sheet h2{font-size:12pt;border-left:none;padding-left:0;margin:4mm 0 2mm;border-bottom:1px solid #000}
+.sheet h3{font-size:10.5pt;margin:4mm 0 1.5mm}
+.sheet table{width:100%;margin-bottom:3mm}
+.sheet th,.sheet td{border:.6pt solid #444;padding:.6mm 1.4mm;font-size:8.5pt;color:#000}
+.sheet th{background:#e9edf2}
+.sheet td.na{background:#e2e2e2}
+.sheet .lc td.x{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cline x1='0' y1='0' x2='100' y2='100' stroke='%23333' stroke-width='1.4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center/100% 100% no-repeat}
+.sheet.land th,.sheet.land td{font-size:7.6pt;padding:.25mm 1mm;line-height:1.25}
+.sheet td.ng{background:#f6d5d1;color:#000}
+.sheet .kv{display:grid;grid-template-columns:52mm 1fr;gap:.5mm 4mm;margin-left:4mm}
+.sheet .formula{font-size:10pt;line-height:1.75}
+.sheet .formula .r{color:#000}
+.sheet .formula .eq{padding-left:5mm}
+.sheet .sec-row{display:flex;gap:5mm;align-items:flex-start;break-inside:avoid;border-bottom:.5pt dashed #999;padding:2mm 0}
+.sheet .sec-row table{width:auto}
+.sheet .blk{break-inside:avoid}
+.sheet .cover{border:1.5pt solid #000;border-radius:4mm;padding:30mm 10mm;text-align:center;margin:20mm 0}
+.sheet .cover .t1{font-size:22pt;font-weight:700;letter-spacing:.2em}
+.sheet .cover .t2{font-size:13pt;margin-top:8mm}
+.sheet .badge{border:.6pt solid #000;background:#fff!important;color:#000!important}
+@media print{
+  body{background:#fff}
+  #app,#pvbar{display:none!important}
+  #print{display:block!important;padding:0!important;background:#fff!important}
+  .sheet{width:auto!important;margin:0!important;padding:0!important;box-shadow:none!important;break-after:page}
+  .sheet:last-child{break-after:auto}
+  .sheet.land{page:land}
+  .sheet thead{display:table-header-group}
+  .sheet tr{break-inside:avoid}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+<style id="pageStyle"></style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div>
+    <h1>伸臂強度計算書 <span class="sub">Strength Calculation for Boom</span></h1>
+    <div class="sub" id="hdrInfo"></div>
+  </div>
+  <div class="btns">
+    <button id="btnSave" title="將所有輸入資料存成 JSON 檔">儲存資料檔</button>
+    <button id="btnLoad" title="載入先前儲存的 JSON 檔">載入資料檔</button>
+    <button id="btnPreview" class="s2only">A4 列印預覽</button>
+    <button id="btnPrint" class="s2only">列印 A4</button>
+    <input type="file" id="fileIn" accept=".json,application/json" hidden>
+  </div>
+</header>
+<nav id="nav">
+  <a class="st" data-step="1"><b>STEP 1</b>選擇機具</a>
+  <a class="st" data-step="2"><b>STEP 2</b>資料與計算</a>
+  <span class="s2only" style="display:flex">
+  <a class="sub2" data-p="p1">設計條件</a>
+  <a class="sub2" data-p="p2">荷重性能表</a>
+  <a class="sub2" data-p="p3">伸臂斷面</a>
+  <a class="sub2" data-p="p4">重量與重心</a>
+  <a class="sub2" data-p="p5">計算結果</a>
+  <a class="sub2" data-p="p6">計算明細</a></span>
+  <span class="legend"><span><i style="background:var(--in-bg);border:1px solid var(--in-bd)"></i>可輸入欄位</span><span><b class="calc">藍字</b> 計算值</span></span>
+</nav>
+<main>
+  <div id="step1"></div>
+  <div id="step2">
+  <div id="srcBanner"></div>
+  <section class="panel" id="p1"></section>
+  <section class="panel" id="p2"></section>
+  <section class="panel" id="p3"></section>
+  <section class="panel" id="p4"></section>
+  <section class="panel" id="p5"></section>
+  <section class="panel" id="p6"></section>
+  </div>
+</main>
+</div>
+<div id="pvbar"><b>A4 列印預覽</b><span class="sub">直式 A4，表 3～7 為橫式；實際分頁以瀏覽器列印為準</span><span style="flex:1"></span>
+  <label class="sub" style="opacity:1"><input type="checkbox" id="pvDetail" checked> 附各斷面控制條件計算明細</label>
+  <button class="pri" id="pvPrint">列印</button><button id="pvClose" style="background:transparent;color:#fff">關閉預覽</button></div>
+<div id="print"></div>
+
+<script>
+/* =========================================================
+   伸臂強度計算書 — 依「移動式起重機構造規格」及 JIS B 8821 之計算方法
+   單位：長度 cm、力 kgf、應力 kgf/cm²（荷重性能表之伸臂長、作業半徑為 m）
+   重心位置兩種來源：
+     STEP 1 選擇機具：資料庫機具（oem：原廠表 2 之 L、ℓ0、ℓi，鎖定）或自行計算
+     （est：各部位置以伸臂最底端旋轉中心為基準點，依伸出比例推算，ℓ = x − x斷面）
+     STEP 2 單頁顯示全部輸入與計算結果
+   ========================================================= */
+const LET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const secName = k => LET[k] + '-' + LET[k];
+const boomName = k => `伸臂(${k + 1})`;
+const RAD = Math.PI / 180;
+const STORE_KEY = 'boomStrengthCalc.v1';
+
+const { MACHINES, dataURA506WY, dataBlank, SELF_DESIGN } = window.BoomLib;   // 機具資料庫：boom-db.js
+/* 資料庫機具：原廠外觀尺寸、重量、重心距離、荷重點為鎖定欄位 */
+const LOCK_KEYS = ['shape', 'booms', 'items', 'stages'];
+const isDb = () => !!MACHINES[S.src];
+const CASE_CHART = () => !!window.CASE_ID && S.src === 'self';   // 荷重性能表跟隨主控台 S1-3
+const CHART_RO = () => isDb() || CASE_CHART();
+const locked = path => (isDb() && (/^(booms|items|stages)\./.test(path) || path === 'project.model'))
+  || (CASE_CHART() && /^stages\.\d+\.(len|rows)/.test(path))
+  || (/^booms\.\d+\.sec\./.test(path) && NOCHART());   // 無荷重表：斷面於主控台 S1-3 輸入
+
+function baseState() {
+  const m = dataURA506WY();
+  return {
+    src: null, step: 1, geoMode: 'oem',
+    project: { title: '', model: '', no: '', author: '', date: new Date().toISOString().slice(0, 10) },
+    design: m.design, chart: { title: '吊升荷重表', radii: '' },
+    shape: m.shape, booms: m.booms, items: m.items, stages: m.stages, est: m.est,
+    ui: { det: { s: 0, r: 0, k: 0 } }
+  };
+}
+function fillGeo(st) {   // 補齊表 2 結構（空白範本用）
+  st.stages.forEach(s => { if (!s.geo || s.geo.length !== st.booms.length) s.geo = st.booms.map(() => ({ L: null, l0: null, li: st.items.map(() => null) })); });
+}
+function newState(m, src, geoMode, model) {
+  const keep = S ? S.project : {}, b = baseState();
+  const s = Object.assign(b, m, { src, step: 2, geoMode });
+  s.project = { ...b.project, ...m.project, author: (keep && keep.author) || '', date: (keep && keep.date) || b.project.date };
+  if (model != null) s.project.model = model;
+  s.chart = { title: '吊升荷重表', radii: '' };
+  fillGeo(s);
+  return s;
+}
+/* STEP 1 → 資料庫機具：外觀尺寸、重量、重心距離、荷重點全部帶入原廠資料 */
+function pickMachine(id) { S = newState(MACHINES[id].data(), id, 'oem'); }
+/* STEP 1 → 自行計算：重心依伸臂長度推算（實測估算模式），其他數值使用者填寫；可選範本 */
+function startSelf(tpl) {
+  const m = MACHINES[tpl] ? MACHINES[tpl].data() : dataBlank();
+  S = newState(m, 'self', 'est', MACHINES[tpl] ? m.project.model + '（自行計算）' : '');
+  Object.assign(S.design, SELF_DESIGN);
+}
+function migrate(o) {
+  const b = baseState();
+  const S2 = Object.assign(b, o);
+  S2.design = Object.assign(baseState().design, o.design || {});
+  if (!(o.design && o.design.weldEff > 0)) S2.design.weldEff = o.src === 'self' ? SELF_DESIGN.weldEff : 1;
+  if (o.src === 'self' && !(o.design && o.design.rOff > 0)) S2.design.rOff = SELF_DESIGN.rOff;   // 偏移預設 20 cm
+  S2.project = Object.assign(baseState().project, o.project || {});
+  if (!S2.chart) S2.chart = { title: '吊升荷重表', radii: '' };
+  if (o.src === undefined) { S2.src = null; S2.step = 1; }   // 舊版資料：回到 STEP 1
+  if (MACHINES[S2.src]) {   // 資料庫機具：鎖定欄位一律以資料庫為準
+    const m = MACHINES[S2.src].data();
+    LOCK_KEYS.forEach(k => S2[k] = m[k]); S2.est = m.est; S2.geoMode = 'oem'; S2.project.model = m.project.model;
+  } else if (S2.src === 'self') { S2.geoMode = 'est'; if (S2.est && Array.isArray(S2.est.Xsec) && !(S2.est.Xsec[0] > 0)) S2.est.Xsec[0] = 100; }   // 此處 isNum 尚未定義，勿使用
+  S2.booms.forEach(bm => { if (bm.sec.fold === undefined) bm.sec.fold = bm.sec.dtL > 0 || bm.sec.dbL > 0; });
+  fillGeo(S2);
+  S2.ui = { det: (o.ui && o.ui.det) || { s: 0, r: 0, k: 0 } };
+  return S2;
+}
+
+let S = null;
+try { const raw = JSON.parse(localStorage.getItem(STORE_KEY)); if (raw && raw.booms) S = migrate(raw); } catch (e) { S = null; console.error('伸臂強度資料讀取失敗', e); }
+if (!S) S = baseState();
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
+
+/* ---------------- 工具 ---------------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const isNum = v => v !== null && v !== '' && v !== undefined && isFinite(v);
+function f(x, d = 2) { if (!isNum(x)) return '—'; return Number(x).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function rv(x) {
+  if (!isNum(x)) return x;
+  const m = S.design.round;
+  if (m === 'ceil') return x === 0 ? 0 : Math.sign(x) * Math.ceil(Math.abs(x) - 1e-9);
+  if (m === 'round') return Math.round(x);
+  return Math.round(x * 10) / 10;
+}
+const fs = x => !isNum(x) ? '' : (S.design.round === 'dec1' ? f(x, 1) : f(x, 0));
+function getPath(p) { return p.split('.').reduce((o, k) => o == null ? o : o[k], S); }
+function setPath(p, v) {
+  const ks = p.split('.'); let o = S;
+  for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]];
+  o[ks[ks.length - 1]] = v;
+}
+function ni(path, attrs = '') {
+  const v = getPath(path);
+  return `<input type="number" step="any" data-k="${path}" value="${isNum(v) ? v : ''}" ${attrs}${locked(path) ? ' disabled title="資料庫原廠資料（鎖定）"' : ''}>`;
+}
+const RO = () => isDb();   // 資料庫機具：結構性操作（增減節數、荷重點、重量項目、斷面形狀）停用
+function fld(label, path, unit = '', attrs = '') {
+  return `<div class="f"><label>${label}</label>${ni(path, attrs)}<span class="u">${unit}</span></div>`;
+}
+
+/* ---------------- 斷面幾何、斷面性質與工程圖：boom-geo.js（與主控台 S1-3 共用） ---------------- */
+const { secGeom, drawingScale, scaleBar } = window.BoomGeo;
+const drawSection = (k, g, sc, sizeAttr = '', mk = 'ar') => window.BoomGeo.drawSection(k, g, sc, sizeAttr, mk, S.booms[k].sec);
+
+/* ---------------- 挫屈係數 ω ---------------- */
+/* 挫屈係數表：(1)~(5) 日本移動式起重機構造規格別表 = 台灣起重升降機具安全規則附表一 第一~五表（逐值相同），
+   (6)(7) 僅台灣附表一有。λ = 20 ~ 200；up = 上欄（鋼管以外之鋼材）、lo = 下欄（鋼管；僅列至與上欄合併處，之後同上欄）。
+   λ < 20 時 ω = 1。 */
+const OMEGA_CODE = [
+  { fy: 245, up: [1,1,1,1,1.01,1.01,1.01,1.02,1.02,1.03,1.03,1.04,1.04,1.05,1.05,1.06,1.06,1.07,1.08,1.08,1.09,1.1,1.1,1.11,1.12,1.12,1.13,1.14,1.14,1.15,1.16,1.17,1.18,1.19,1.19,1.2,1.21,1.22,1.23,1.24,1.25,1.26,1.27,1.28,1.29,1.31,1.32,1.33,1.34,1.35,1.37,1.38,1.39,1.41,1.42,1.43,1.45,1.46,1.48,1.49,1.51,1.52,1.54,1.55,1.57,1.59,1.6,1.62,1.64,1.66,1.68,1.69,1.71,1.73,1.75,1.77,1.79,1.81,1.83,1.85,1.87,1.89,1.91,1.94,1.96,1.98,2,2.03,2.05,2.07,2.11,2.15,2.19,2.23,2.27,2.31,2.35,2.39,2.43,2.47,2.51,2.56,2.6,2.64,2.69,2.73,2.77,2.82,2.86,2.91,2.95,3,3.04,3.09,3.14,3.18,3.23,3.28,3.33,3.37,3.42,3.47,3.52,3.57,3.62,3.67,3.72,3.77,3.83,3.88,3.93,3.98,4.03,4.09,4.14,4.2,4.25,4.3,4.36,4.42,4.47,4.53,4.58,4.64,4.7,4.75,4.81,4.87,4.93,4.99,5.05,5.11,5.17,5.23,5.29,5.35,5.41,5.47,5.53,5.6,5.66,5.72,5.78,5.85,5.91,5.98,6.04,6.11,6.17,6.24,6.3,6.37,6.44,6.51,6.57,6.64,6.71,6.78,6.85,6.92,6.99],
+    lo: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1.01,1.01,1.02,1.02,1.03,1.03,1.04,1.04,1.05,1.05,1.06,1.06,1.07,1.08,1.08,1.09,1.1,1.1,1.11,1.12,1.12,1.13,1.14,1.15,1.16,1.16,1.17,1.18,1.19,1.2,1.21,1.22,1.23,1.24,1.25,1.26,1.27,1.29,1.3,1.31,1.32,1.33,1.35,1.36,1.37,1.39,1.4,1.42,1.43,1.45,1.46,1.48,1.5,1.51,1.53,1.55,1.56,1.58,1.61,1.64,1.68,1.71,1.75,1.78,1.82,1.85,1.89,1.93,1.96,2,2.04] },
+  { fy: 325, up: [1,1,1,1.01,1.01,1.02,1.02,1.03,1.03,1.04,1.04,1.05,1.05,1.06,1.07,1.07,1.08,1.09,1.09,1.1,1.11,1.12,1.13,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.2,1.21,1.22,1.23,1.24,1.25,1.27,1.28,1.29,1.3,1.32,1.33,1.35,1.36,1.37,1.39,1.41,1.42,1.44,1.45,1.47,1.49,1.51,1.52,1.54,1.56,1.58,1.6,1.62,1.64,1.66,1.68,1.7,1.72,1.75,1.77,1.79,1.82,1.84,1.86,1.89,1.92,1.96,2,2.05,2.09,2.14,2.18,2.22,2.27,2.32,2.36,2.41,2.46,2.51,2.55,2.6,2.65,2.7,2.75,2.8,2.85,2.91,2.96,3.01,3.06,3.12,3.17,3.23,3.28,3.34,3.39,3.45,3.5,3.56,3.62,3.68,3.74,3.8,3.86,3.92,3.98,4.04,4.1,4.16,4.22,4.28,4.35,4.41,4.48,4.54,4.61,4.67,4.74,4.8,4.87,4.94,5.01,5.07,5.14,5.21,5.28,5.35,5.42,5.49,5.57,5.64,5.71,5.78,5.86,5.93,6.01,6.08,6.16,6.23,6.31,6.38,6.46,6.54,6.62,6.7,6.77,6.85,6.93,7.01,7.09,7.18,7.26,7.34,7.42,7.51,7.59,7.67,7.76,7.84,7.93,8.01,8.1,8.19,8.28,8.36,8.45,8.54,8.63,8.72,8.81,8.9,8.99,9.08,9.17,9.27],
+    lo: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1.01,1.01,1.02,1.02,1.03,1.03,1.04,1.04,1.05,1.06,1.06,1.07,1.08,1.08,1.09,1.1,1.11,1.12,1.13,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.2,1.22,1.23,1.24,1.25,1.27,1.28,1.29,1.31,1.32,1.34,1.35,1.37,1.38,1.4,1.42,1.43,1.45,1.47,1.49,1.52,1.56,1.6,1.63,1.67,1.71,1.75,1.79,1.84,1.88] },
+  { fy: 365, up: [1,1,1,1.01,1.01,1.02,1.02,1.03,1.04,1.04,1.05,1.05,1.06,1.07,1.07,1.08,1.09,1.1,1.1,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.2,1.21,1.22,1.23,1.24,1.26,1.27,1.28,1.3,1.31,1.32,1.34,1.35,1.37,1.38,1.4,1.42,1.43,1.45,1.47,1.49,1.51,1.53,1.55,1.57,1.59,1.61,1.63,1.65,1.67,1.7,1.72,1.74,1.77,1.79,1.82,1.84,1.88,1.92,1.97,2.01,2.06,2.11,2.15,2.2,2.25,2.3,2.35,2.4,2.45,2.5,2.55,2.6,2.65,2.71,2.76,2.81,2.87,2.92,2.98,3.03,3.09,3.15,3.21,3.26,3.32,3.38,3.44,3.5,3.56,3.62,3.68,3.75,3.81,3.87,3.94,4,4.07,4.13,4.2,4.26,4.33,4.4,4.46,4.53,4.6,4.67,4.74,4.81,4.88,4.95,5.03,5.1,5.17,5.25,5.32,5.4,5.47,5.55,5.62,5.7,5.78,5.85,5.93,6.01,6.09,6.17,6.25,6.33,6.41,6.5,6.58,6.66,6.74,6.83,6.91,7,7.08,7.17,7.26,7.34,7.43,7.52,7.61,7.7,7.79,7.88,7.97,8.06,8.15,8.24,8.34,8.43,8.52,8.62,8.71,8.81,8.9,9,9.1,9.2,9.29,9.39,9.49,9.59,9.69,9.79,9.89,10,10.1,10.2,10.3,10.41],
+    lo: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1.01,1.01,1.02,1.02,1.03,1.03,1.04,1.05,1.05,1.06,1.07,1.08,1.08,1.09,1.1,1.11,1.12,1.13,1.14,1.14,1.16,1.17,1.18,1.19,1.2,1.21,1.22,1.24,1.25,1.26,1.28,1.29,1.31,1.32,1.34,1.36,1.37,1.39,1.41,1.43,1.44,1.46,1.5,1.54,1.58,1.62,1.67,1.71,1.75,1.79] },
+  { fy: 460, up: [1,1,1.01,1.02,1.02,1.03,1.03,1.04,1.05,1.05,1.06,1.07,1.07,1.08,1.09,1.1,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.2,1.22,1.23,1.24,1.26,1.27,1.29,1.3,1.32,1.33,1.35,1.37,1.39,1.4,1.42,1.44,1.46,1.48,1.5,1.53,1.55,1.57,1.6,1.62,1.64,1.67,1.69,1.72,1.75,1.8,1.84,1.89,1.94,1.99,2.05,2.1,2.15,2.2,2.26,2.31,2.37,2.43,2.48,2.54,2.6,2.66,2.72,2.78,2.84,2.9,2.96,3.02,3.09,3.15,3.21,3.28,3.34,3.41,3.48,3.55,3.62,3.68,3.75,3.82,3.9,3.97,4.04,4.11,4.19,4.26,4.34,4.41,4.49,4.57,4.64,4.72,4.8,4.88,4.96,5.04,5.12,5.21,5.29,5.37,5.46,5.54,5.63,5.71,5.8,5.89,5.98,6.06,6.15,6.24,6.34,6.43,6.52,6.61,6.71,6.8,6.89,6.99,7.09,7.18,7.28,7.38,7.48,7.58,7.68,7.78,7.88,7.98,8.08,8.19,8.29,8.39,8.5,8.61,8.71,8.82,8.93,9.04,9.14,9.25,9.37,9.48,9.59,9.7,9.81,9.93,10.04,10.16,10.27,10.39,10.51,10.62,10.74,10.86,10.98,11.1,11.22,11.34,11.47,11.59,11.71,11.84,11.96,12.09,12.21,12.34,12.47,12.6,12.73,12.86,12.99,13.12],
+    lo: [1,1,1,1,1,1,1,1,1,1,1,1,1.01,1.01,1.02,1.03,1.03,1.04,1.05,1.05,1.06,1.07,1.08,1.09,1.1,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.2,1.21,1.22,1.24,1.25,1.27,1.29,1.3,1.32,1.34,1.36,1.38,1.4,1.43,1.47,1.52,1.56,1.61,1.65,1.7] },
+  { fy: 575, up: [1.01,1.01,1.02,1.02,1.03,1.04,1.04,1.05,1.06,1.07,1.08,1.08,1.09,1.1,1.11,1.12,1.13,1.14,1.16,1.17,1.18,1.19,1.21,1.22,1.24,1.25,1.27,1.29,1.3,1.32,1.34,1.36,1.38,1.4,1.42,1.44,1.47,1.49,1.51,1.54,1.56,1.59,1.62,1.64,1.68,1.73,1.79,1.84,1.9,1.95,2.01,2.07,2.12,2.18,2.24,2.31,2.37,2.43,2.49,2.56,2.62,2.69,2.76,2.82,2.89,2.96,3.03,3.1,3.17,3.25,3.32,3.39,3.47,3.55,3.62,3.7,3.78,3.86,3.94,4.02,4.1,4.18,4.26,4.35,4.43,4.52,4.61,4.69,4.78,4.87,4.96,5.05,5.14,5.23,5.33,5.42,5.52,5.61,5.71,5.8,5.9,6,6.1,6.2,6.3,6.4,6.51,6.61,6.72,6.82,6.93,7.03,7.14,7.25,7.36,7.47,7.58,7.69,7.81,7.92,8.03,8.15,8.26,8.38,8.5,8.62,8.74,8.86,8.98,9.1,9.22,9.35,9.47,9.59,9.72,9.85,9.97,10.1,10.23,10.36,10.49,10.62,10.76,10.89,11.02,11.16,11.29,11.43,11.57,11.71,11.85,11.99,12.13,12.27,12.41,12.55,12.7,12.84,12.99,13.13,13.28,13.43,13.58,13.73,13.88,14.03,14.18,14.33,14.49,14.64,14.8,14.95,15.11,15.27,15.43,15.59,15.75,15.91,16.07,16.23,16.4],
+    lo: [1,1,1,1,1,1,1,1,1,1,1.01,1.02,1.02,1.03,1.04,1.04,1.05,1.06,1.07,1.08,1.09,1.1,1.11,1.12,1.13,1.15,1.16,1.17,1.19,1.2,1.22,1.23,1.25,1.27,1.29,1.31,1.33,1.35,1.38,1.43,1.48,1.53,1.58,1.63] },
+  { fy: 620, up: [1.01,1.01,1.02,1.03,1.03,1.04,1.05,1.06,1.06,1.07,1.08,1.09,1.1,1.11,1.12,1.13,1.14,1.16,1.17,1.18,1.2,1.21,1.22,1.24,1.26,1.27,1.29,1.31,1.33,1.35,1.37,1.39,1.41,1.43,1.46,1.48,1.51,1.53,1.56,1.59,1.61,1.64,1.7,1.75,1.81,1.87,1.93,1.98,2.04,2.1,2.17,2.23,2.29,2.36,2.42,2.49,2.55,2.62,2.69,2.76,2.83,2.9,2.97,3.04,3.12,3.19,3.27,3.35,3.42,3.5,3.58,3.66,3.74,3.82,3.91,3.99,4.07,4.16,4.24,4.33,4.42,4.51,4.6,4.69,4.78,4.87,4.97,5.06,5.15,5.25,5.35,5.45,5.54,5.64,5.74,5.84,5.95,6.05,6.15,6.26,6.36,6.47,6.58,6.69,6.8,6.91,7.02,7.13,7.24,7.35,7.47,7.58,7.7,7.82,7.94,8.05,8.17,8.3,8.42,8.54,8.66,8.79,8.91,9.04,9.16,9.29,9.42,9.55,9.68,9.81,9.94,10.08,10.21,10.35,10.48,10.62,10.76,10.89,11.03,11.17,11.31,11.46,11.6,11.74,11.89,12.03,12.18,12.33,12.47,12.62,12.77,12.92,13.07,13.23,13.38,13.53,13.69,13.85,14,14.16,14.32,14.48,14.64,14.8,14.96,15.13,15.29,15.45,15.62,15.79,15.95,16.12,16.29,16.46,16.63,16.81,16.98,17.15,17.33,17.5,17.68],
+    lo: [1,1,1,1,1,1,1,1,1,1.01,1.01,1.02,1.03,1.04,1.04,1.05,1.06,1.07,1.08,1.09,1.1,1.11,1.12,1.14,1.15,1.16,1.18,1.19,1.21,1.23,1.24,1.26,1.28,1.3,1.32,1.34,1.39,1.44,1.49,1.54,1.59] },
+  { fy: 685, up: [1,1,1,1,1,1,1,1.01,1.02,1.02,1.03,1.04,1.05,1.06,1.08,1.09,1.1,1.11,1.13,1.14,1.15,1.17,1.19,1.2,1.22,1.24,1.26,1.28,1.3,1.32,1.34,1.36,1.39,1.41,1.43,1.46,1.49,1.51,1.56,1.61,1.67,1.72,1.78,1.84,1.9,1.96,2.02,2.08,2.14,2.21,2.27,2.34,2.4,2.47,2.54,2.61,2.68,2.75,2.82,2.89,2.97,3.04,3.12,3.19,3.27,3.35,3.43,3.51,3.59,3.67,3.75,3.84,3.92,4.01,4.09,4.18,4.27,4.36,4.45,4.54,4.63,4.73,4.82,4.92,5.01,5.11,5.21,5.3,5.4,5.5,5.61,5.71,5.81,5.92,6.02,6.13,6.23,6.34,6.45,6.56,6.67,6.78,6.9,7.01,7.12,7.24,7.36,7.47,7.59,7.71,7.83,7.95,8.07,8.2,8.32,8.44,8.57,8.7,8.82,8.95,9.08,9.21,9.34,9.47,9.61,9.74,9.88,10.01,10.15,10.29,10.43,10.56,10.7,10.85,10.99,11.13,11.28,11.42,11.57,11.71,11.86,12.01,12.16,12.31,12.46,12.61,12.77,12.92,13.08,13.23,13.39,13.55,13.71,13.87,14.03,14.19,14.35,14.52,14.68,14.85,15.01,15.18,15.35,15.52,15.69,15.86,16.03,16.2,16.38,16.55,16.73,16.9,17.08,17.26,17.44,17.62,17.8,17.98,18.16,18.35,18.53],
+    lo: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1.01,1.02,1.03,1.04,1.05,1.06,1.07,1.09,1.1,1.11,1.13,1.14,1.16,1.18,1.2,1.22,1.24,1.26,1.3,1.35,1.4,1.45] }
+];
+function Lambda0() { const d = S.design; return Math.sqrt(Math.PI * Math.PI * d.E / (0.6 * d.sigY)); }
+function omegaFormula(lam) {
+  const r = lam / Lambda0();
+  if (!(lam > 0)) return 1;
+  if (r <= 1) return (1.5 + (2 / 3) * r * r) / (1.5 * (1 - 0.4 * r * r));
+  return (2.1666667 / 0.9) * r * r;
+}
+function defaultOmegaTable() { const t = []; for (let l = 0; l <= 200; l += 10) t.push([l, Math.round(omegaFormula(l) * 100) / 100]); return t; }
+const KGF = 9.80665;   // 1 N/mm² = 1/0.0980665 kgf/cm²
+const fyN = () => S.design.sigY * KGF / 100;   // σy 換算 N/mm²
+function omegaCls() {
+  const d = S.design;
+  if (d.omegaCls >= 1 && d.omegaCls <= OMEGA_CODE.length) return d.omegaCls - 1;
+  const fy = fyN(), i = OMEGA_CODE.findIndex(c => fy <= c.fy + 1e-6);
+  return i < 0 ? OMEGA_CODE.length - 1 : i;
+}
+function omegaCode(lam) {
+  if (!(lam >= 20)) return 1;
+  const c = OMEGA_CODE[omegaCls()], lo = S.design.omegaRow === 'lo';
+  const at = j => lo && j < c.lo.length ? c.lo[j] : c.up[j];
+  const x = Math.min(lam, 200) - 20, j = Math.floor(x);
+  if (j >= 180) return at(180);
+  return at(j) + (at(j + 1) - at(j)) * (x - j);
+}
+function omegaOf(lam) {
+  const d = S.design;
+  if (d.omegaMode === 'code') return omegaCode(lam);
+  if (d.omegaMode !== 'table') return omegaFormula(lam);
+  const t = (d.omegaTable || []).filter(r => isNum(r[0]) && isNum(r[1])).sort((a, b) => a[0] - b[0]);
+  if (!t.length) return omegaFormula(lam);
+  if (lam <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) if (lam <= t[i][0]) {
+    const [l0, w0] = t[i - 1], [l1, w1] = t[i];
+    return w0 + (w1 - w0) * (lam - l0) / (l1 - l0);
+  }
+  return t[t.length - 1][1];
+}
+
+/* ---------------- 重心位置：原廠數據 / 實測估算 ---------------- */
+/* 各伸臂長度段之伸出狀態 d：依伸臂長由短到長排序，最短 = 1（全縮），最長 = N（全伸） */
+function stageD() {
+  const idx = S.stages.map((_, s) => s).sort((a, b) => (S.stages[a].len || 0) - (S.stages[b].len || 0));
+  const d = []; idx.forEach((s, i) => d[s] = i + 1); return d;
+}
+/* 伸出比例（同「安定度計算」附件1）：第 2~m 節依序由油壓缸伸出；第 m+1~n 節由最後一支油壓缸以鋼索同步伸縮 */
+function extRatios(d) {
+  const n = S.booms.length, m = S.est.m;
+  return S.booms.map((_, k) => {
+    const j = k + 1;
+    if (j === 1) return 1;
+    if (j <= m) return j <= d ? 1 : 0;
+    return n > m ? Math.min(1, Math.max(0, (d - m) / (n - m))) : 0;
+  });
+}
+function estStage(d) {
+  const E = S.est, n = S.booms.length;
+  const r = extRatios(d);
+  const seg = E.X.map((x, k) => x - (k ? E.X[k - 1] : 0));
+  const tip = []; let acc = 0;
+  seg.forEach((sg, k) => { acc += sg * r[k]; tip.push(acc); });
+  const shift = E.X.map((x, k) => x - tip[k]);
+  const xsec = E.Xsec.map((x, k) => x - (k ? shift[k - 1] : 0));
+  const xpin = E.Xpin - shift[n - 1];
+  const itemX = E.items.map(it => {
+    if (it.kind === 'boom') { const j = (it.boom | 0) - 1; return j >= 0 && j < n ? tip[j] - seg[j] / 2 : NaN; }
+    if (it.kind === 'cyl') { const c = (it.cyl | 0) - 1; if (c < 0 || c >= n) return NaN; return ((tip[c] - seg[c]) + (c + 1 < n ? tip[c + 1] : tip[c])) / 2; }
+    const j = (it.boom | 0) - 1; return isNum(it.X) ? it.X - (j >= 0 && j < n ? shift[j] : 0) : NaN;
+  });
+  const tables = S.booms.map((_, k) => {
+    const active = k === 0 || r[k] > 1e-9;
+    if (!active) return { L: null, l0: null, li: E.items.map(() => null), active: false };
+    return {
+      L: xpin - xsec[k], l0: tip[k] - xsec[k], active: true,
+      li: E.items.map((it, i) => {
+        if (it.kind === 'boom' && (it.boom | 0) - 1 <= k) return null;
+        const l = itemX[i] - xsec[k]; return isNum(l) && l > 0 ? l : null;
+      })
+    };
+  });
+  return { d, r, seg, tip, xsec, xpin, itemX, tables, len: xpin / 100 };
+}
+function effGeo() {
+  if (S.geoMode === 'est') {
+    const D = stageD();
+    const st = S.stages.map((_, s) => estStage(D[s]));
+    return { mode: 'est', items: S.est.items, st, tables: st.map(x => x.tables) };
+  }
+  return {
+    mode: 'oem', items: S.items,
+    tables: S.stages.map(st => st.geo.map(g => ({ L: g.L, l0: g.l0, li: g.li, active: isNum(g.L) })))
+  };
+}
+
+/* ---------------- 主計算 ---------------- */
+const weld = () => (S.design.weldEff > 0 ? S.design.weldEff : 1);   // 熔接效率 η
+/* 基本容許應力 σa₀：資料庫機具採原廠值；自行計算 = σF / 1.5，σF = min(降伏應力 σy, 0.75 × 抗拉強度 σB) */
+const sigA0 = () => {
+  const d = S.design;
+  if (isDb()) return d.sigA0;
+  const fy = Math.min(isNum(d.sigY) ? d.sigY : Infinity, isNum(d.sigB) ? 0.75 * d.sigB : Infinity);
+  return isFinite(fy) ? Math.round(fy / 1.5) : NaN;
+};
+const sigA = () => sigA0() * S.design.kA * weld();
+/* 壓應力側容許應力 σca = σa₀ / 係數 × 增加係數（現行構造規格第 3 條：σca = σa / 1.15） */
+const sigAc = () => sigA0() / (S.design.cDiv > 0 ? S.design.cDiv : 1) * S.design.kA * weld();
+const qWind = () => S.design.qk * Math.pow(Math.max(S.design.h, 16), 0.25);
+function thetaOf(st, row) {
+  const d = S.design;
+  if (d.thetaFromR) {
+    // 伸臂腳銷位於迴轉中心後方 a：R = L·cosθ − a → cosθ = (R + a) / L；(R + a) > L 時伸臂近水平，取 θ = 0°
+    if (!isNum(row[1]) || !(st.len > 0)) return NaN;
+    return Math.acos(Math.min(1, Math.max(-1, (row[1] + (d.rOff || 0)) / st.len))) / RAD;
+  }
+  return row[2];
+}
+function boomG(items, k) { return items.reduce((s, it) => s + ((it.kind ? it.kind === 'boom' : true) && Number(it.boom) === k + 1 && isNum(it.G) ? it.G : 0), 0); }
+
+function windOf(T, k, geo) {
+  if (!T[k].active) return null;
+  const C = S.design.C, q = qWind(), Lk = T[k].L;
+  const act = []; for (let j = k; j < S.booms.length; j++) if (T[j].active) act.push(j);
+  const segs = []; let M = 0;
+  act.forEach((j, i) => {
+    const Lj = T[j].L, nx = act[i + 1];
+    const len = nx != null ? Lj - T[nx].L : Math.max(isNum(T[j].l0) ? T[j].l0 : 0, Lj);
+    const Hj = geo[j] && !geo[j].err ? geo[j].H : 0;
+    const Am = len * Hj / 1e4, Wg = q * C * Am, arm = (Lk - Lj) + len / 2;
+    segs.push({ j, len, H: Hj, Am, Wg, arm, M: Wg * arm }); M += Wg * arm;
+  });
+  if (S.design.headA > 0) { const Wg = q * C * S.design.headA; segs.push({ j: -1, len: 0, H: 0, Am: S.design.headA, Wg, arm: Lk, M: Wg * Lk }); M += Wg * Lk; }
+  return { q, C, segs, M };
+}
+
+/* 伸臂單位長重量 w（kgf/cm）：資料庫機具採原廠值；自行計算 = A (cm²) × 7.85×10⁻³ kgf/cm³（鋼材比重 7.85） */
+const STEEL = 7.85e-3;
+function wOf(k, g) {
+  if (isDb()) return S.booms[k].w;
+  return g && !g.err ? Math.round(g.A * STEEL * 1000) / 1000 : NaN;
+}
+/* 單一荷重點（額定荷重 W、伸臂角 th）各斷面之應力 */
+function rowCalc(T, wind, geo, items, W, th) {
+  const d = S.design, N = S.booms.length;
+  const c = Math.cos(th * RAD), sn = Math.sin(th * RAD);
+      let ax = null;
+      const t = N - 1;
+      if (d.axial === 'wire' && N >= 4 && T[t].active && isNum(W) && isNum(th)) {
+        const Gt = boomG(items, t), G1 = boomG(items, t - 1), G2 = boomG(items, t - 2);
+        const Nt = (d.psi1 * W + d.psi2 * Gt) * sn + d.psi1 * W / d.nRope;
+        const N1 = 2 * Nt + d.psi2 * G1 * sn;
+        const N2 = 2 * N1 - Nt + d.psi2 * G2 * sn;
+        ax = { [t]: { N: Nt, comp: true, lb: T[t].L, G: Gt },
+               [t - 1]: { N: N1, comp: true, lb: T[t - 1].active ? T[t - 1].L - T[t].L : NaN, G: G1 },
+               [t - 2]: { N: N2, comp: true, lb: T[t - 2].active && T[t - 1].active ? T[t - 2].L - T[t - 1].L : NaN, G: G2 },
+               [t - 3]: { N: N1, comp: false } };
+      }
+      const secs = S.booms.map((bm, k) => {
+        const g = T[k], sg = geo[k];
+        if (!g.active || sg.err || !isNum(W) || !isNum(th)) return { k, active: g.active, bad: g.active };
+        let SG = 0; const terms = [];
+        items.forEach((it, i) => { const l = g.li[i]; if (isNum(l) && isNum(it.G)) { SG += l * it.G; terms.push([i, l, it.G]); } });
+        const l0 = isNum(g.l0) ? g.l0 : 0;
+        const w = wOf(k, sg), Dw = 0.5 * (isNum(w) ? w : 0) * l0 * l0;
+        const Mx = (d.psi1 * W * g.L + d.psi2 * (SG + Dw)) * c;
+        const s1 = Mx / sg.Zx1, s1c = Mx / sg.Zx2;
+        const My = d.phi * (W * g.L + SG + Dw) * c;
+        const s3 = My / sg.Zy;
+        const wd = wind[k]; const s4 = wd ? wd.M / sg.Zy : 0;
+        let s2 = null, s2c = null, axd = null;
+        if (ax && ax[k]) {
+          const a = ax[k];
+          if (a.comp) {
+            const lam = 2 * a.lb / sg.ky, om = isNum(lam) ? omegaOf(lam) : NaN;
+            s2 = -a.N / sg.A; s2c = om * a.N / sg.A; axd = { ...a, lam, om };
+          } else { s2 = a.N / sg.A; s2c = -a.N / sg.A; axd = { ...a }; }
+        }
+        const R = { s1: rv(s1), s1c: rv(s1c), s2: s2 == null ? null : rv(s2), s2c: s2c == null ? null : rv(s2c), s3: rv(s3), s4: rv(s4) };
+        const st_ = R.s1 + (R.s2 || 0) + R.s3 + R.s4;
+        const sc_ = R.s1c + (R.s2c || 0) + R.s3 + R.s4;
+        return { k, active: true, SG, terms, l0, L: g.L, w, Dw, Mx, s1, s1c, My, s3, wind: wd, s4, s2, s2c, axd, R, st: st_, sc: sc_ };
+      });
+  return { W, th, c, sn, secs, ax };
+}
+/* 應力比 = max(σt/σa, σc/σca, σt/疲勞限)；有斷面無法計算時為 ∞ */
+function rowU(secs) {
+  const fat = S.design.fatigueOn ? S.design.fatigue : Infinity, sa = sigA(), sac = sigAc();
+  let u = 0;
+  for (const sc of secs) { if (!sc.R) { if (sc.bad) return Infinity; continue; } u = Math.max(u, sc.st / sa, sc.sc / sac, sc.st / fat); }
+  return u;
+}
+function compute() {
+  const d = S.design, N = S.booms.length;
+  const geo = S.booms.map(b => secGeom(S.shape, b.sec));
+  const eff = effGeo(), items = eff.items;
+  const res = S.stages.map((st, s) => {
+    const T = eff.tables[s];
+    const wind = S.booms.map((_, k) => windOf(T, k, geo));
+    const rows = st.rows.map(row => Object.assign({ R: row[1] }, rowCalc(T, wind, geo, items, row[0], thetaOf(st, row))));
+    return { rows, wind };
+  });
+  // 各斷面最大值
+  const sa = sigA(), sac = sigAc();
+  const sum = S.booms.map(() => ({ t: -Infinity, c: -Infinity, tc: null, cc: null, gov: null, u: -Infinity }));
+  res.forEach((sr, s) => sr.rows.forEach((row, r) => row.secs.forEach(sc => {
+    if (!sc.R) return;
+    const m = sum[sc.k];
+    if (sc.st > m.t) { m.t = sc.st; m.tc = { s, r }; }
+    if (sc.sc > m.c) { m.c = sc.sc; m.cc = { s, r }; }
+    const u = Math.max(sc.st / sa, sc.sc / sac);
+    if (u > m.u) { m.u = u; m.gov = { s, r }; }
+  })));
+  const errs = geo.map((g, k) => g.err ? `斷面 ${secName(k)}：${g.err}` : null).filter(Boolean);
+  const maxU = Math.max(...sum.map(m => m.u).filter(isFinite), 0);
+  const any = sum.some(m => m.gov);
+  // 疲勞：全伸臂合成拉應力最大值與疲勞限比較
+  let fat = null;
+  if (d.fatigueOn) {
+    sum.forEach((m, k) => { if (m.tc && (!fat || m.t > fat.t)) fat = { t: m.t, k, at: m.tc }; });
+    if (fat) fat.ok = fat.t <= d.fatigue;
+  }
+  return { geo, eff, res, sum, errs, maxU, fat, ok: any && !errs.length && maxU <= 1 && (!fat || fat.ok) };
+}
+
+/* ---------------- 伸臂強度允許荷重表（供主控台 S4 荷重表反算） ----------------
+   各伸臂長度，作業半徑每 0.1 m 求使應力比 ≦ 1 之最大額定荷重（含吊具，kgf）；
+   伸臂角 θ = cos⁻¹[(R + a) / 伸臂長]（R = 伸臂長·cosθ − a）；R + a 大於伸臂長時伸臂近水平，取 θ = 0°。自重即超過容許應力者為 0。 */
+const LIM_DR = 0.1;
+function strengthLimits(C) {
+  if (C.errs.length || !S.stages.length) return null;
+  const rOff = isNum(S.design.rOff) ? S.design.rOff : 0, items = C.eff.items;
+  const UT = NOCHART() ? 0.95 : 1;   // 無荷重性能表：反算至應力比約 95%
+  const Wtop = Math.max(20000, ...S.stages.flatMap(st => st.rows.map(r => r[0])).filter(isNum).map(w => w * 2));
+  const out = [];
+  for (let s = 0; s < S.stages.length; s++) {
+    const st = S.stages[s], T = C.eff.tables[s], wind = C.res[s].wind;
+    if (!isNum(st.len) || st.len <= 0 || !T[0].active) return null;
+    const W = [];
+    for (let i = 0; i * LIM_DR <= st.len + 1e-9; i++) {
+      const th = Math.acos(Math.min(1, Math.max(-1, (i * LIM_DR + rOff) / st.len))) / RAD;
+      const u = w => rowU(rowCalc(T, wind, C.geo, items, w, th).secs);
+      if (!(u(0) <= UT)) { W.push(0); continue; }
+      let lo = 0, hi = Wtop;
+      if (u(hi) <= UT) { W.push(Math.floor(hi)); continue; }
+      while (hi - lo > 1) { const m = (lo + hi) / 2; if (u(m) <= UT) lo = m; else hi = m; }
+      W.push(Math.floor(lo));
+    }
+    out.push({ len: st.len, W });
+  }
+  return { dR: LIM_DR, stages: out };
+}
+
+/* ---------------- 無荷重性能表：依斷面強度反算荷重點 ----------------
+   主控台 S1 選「沒有荷重性能表」時，各伸臂長度之荷重點 = 各作業半徑下應力比 ≦ 1 之最大荷重
+   （捨去至 10 kg、隨半徑增加不增加）；半徑自最大起伏角至伸臂水平。最終荷重表由 S4 再與安定度取小值。 */
+let _hubC = null, _hubT = 0;
+function hubCase() { const t = Date.now(); if (t - _hubT > 1000) { try { _hubC = JSON.parse(localStorage.getItem('hub')) || null; } catch (e) { _hubC = null; } _hubT = t; } return _hubC; }
+/* 斷面尺寸取自主控台 S1-3（數值欄轉數字） */
+function syncSecFromHub() {
+  if (!NOCHART()) return false;
+  const bs = (hubCase() || {}).boomSec; if (!bs || !Array.isArray(bs.secs)) return false;
+  const num = v => { const x = parseFloat(v); return isFinite(x) ? x : null; };
+  const before = JSON.stringify([S.shape, S.booms.map(b => b.sec)]);
+  if (bs.shape) S.shape = bs.shape;
+  S.booms.forEach((b, k) => {
+    const x = bs.secs[k]; if (!x) return;
+    ['B', 'H', 'tt', 'ts', 'tb', 'at', 'ab', 'dtL', 'dtT', 'dbL', 'dbT'].forEach(f => { if (x[f] !== undefined) b.sec[f] = num(x[f]); });
+    b.sec.fold = !!x.fold;
+  });
+  const changed = JSON.stringify([S.shape, S.booms.map(b => b.sec)]) !== before;
+  if (changed) save();
+  return changed;
+}
+function NOCHART() { if (!window.CASE_ID || S.src !== 'self') return false; const c = hubCase(); return !!c && c.hasChart === false; }
+function autoRowsFromStrength() {
+  let fin = null; try { fin = JSON.parse(localStorage.getItem('final_chart')); } catch (e) {}
+  const lim = fin ? null : strengthLimits(compute()); if (!fin && !lim) return false;
+  const c = hubCase(), thM = Number(c && c.stab && c.stab.thetaM) || 78, a = isNum(S.design.rOff) ? S.design.rOff : 0;
+  const cap = (parseFloat(c && c.crane && c.crane.orig_capacity_t) || 0) * 1000 || Infinity;   // 原吊升荷重上限
+  let changed = false;
+  S.stages.forEach((st, s) => {
+    if (!(st.len > 0)) return;
+    if (fin) {   // S4 最終荷重表（已含伸臂強度、安定度、原吊升荷重）
+      const ci = fin.booms.findIndex(b => Math.abs(Number(b) - st.len) < 0.005);
+      const rows = ci < 0 ? [] : fin.cells.map(row => row[ci]).filter(Boolean).map(([W, R]) => [W, R, null]);
+      if (!rows.length) rows.push([null, null, null]);
+      if (JSON.stringify(rows) !== JSON.stringify(st.rows)) { st.rows = rows; changed = true; }
+      return;
+    }
+    const L = lim.stages[s]; if (!L) return;
+    const rMax = Math.floor((st.len - a) * 10) / 10;
+    const rMin = Math.max(0.5, Math.ceil((st.len * Math.cos(thM * RAD) - a) * 2) / 2);
+    const grid = [];
+    for (let r = rMin; r < 4 - 1e-9 && r < rMax - 1e-9; r += 0.5) grid.push(+r.toFixed(2));
+    for (let r = Math.max(4, Math.ceil(rMin)); r < rMax - 0.05; r += 1) grid.push(r);
+    grid.push(rMax);
+    const n = L.W.length - 1, rows = []; let prev = Infinity;
+    grid.forEach(r => {
+      const i = r / lim.dR;
+      let W = Math.min(L.W[Math.min(n, Math.floor(i + 1e-9))], L.W[Math.min(n, Math.ceil(i - 1e-9))]);
+      W = Math.min(prev, cap, Math.floor(W / 5) * 5); prev = W;
+      if (W > 0) rows.push([W, r, null]);
+    });
+    if (!rows.length) rows.push([null, null, null]);
+    if (JSON.stringify(rows) !== JSON.stringify(st.rows)) { st.rows = rows; changed = true; }
+  });
+  if (changed) { S.design.thetaFromR = true; save(); }
+  return changed;
+}
+
+/* ---------------- 結構性操作 ---------------- */
+function blankGeo() { return { L: null, l0: null, li: S.items.map(() => null) }; }
+function setN(n) {
+  n = Math.max(1, Math.min(20, n | 0));
+  while (S.booms.length < n) {
+    const last = S.booms[S.booms.length - 1];
+    const k = S.booms.length;
+    const ns = last ? JSON.parse(JSON.stringify(last.sec)) : { B: 20, H: 40, tt: 0.4, ts: 0.4, tb: 0.4, at: 15, ab: 15, fold: false, dtL: 3.5, dtT: 0.3, dbL: 3.5, dbT: 0.3 };
+    if (last) { ns.B = +(ns.B * 0.92).toFixed(2); ns.H = +(ns.H * 0.9).toFixed(2); }
+    S.booms.push({ w: last ? last.w : 0.3, sec: ns });
+    S.items.push({ name: `${boomName(k)} 重量`, G: 0, boom: k + 1 });
+    S.stages.forEach(st => st.geo.forEach(g => g.li.push(null)));
+    S.stages.forEach(st => st.geo.push(blankGeo()));
+    const minLen = S.stages.length ? Math.min(...S.stages.map(s => s.len)) : 5;
+    S.stages.push({ len: +(Math.max(minLen - 2, 1)).toFixed(2), rows: [[1000, 3, 60]], geo: S.booms.map(() => blankGeo()) });
+    const E = S.est, lx = E.X.length ? E.X[E.X.length - 1] : 0;
+    E.Xsec.push(lx); E.X.push(lx + 240); E.Xpin += 240;
+    E.items.push({ name: `${boomName(k)} 重量`, G: 0, kind: 'boom', boom: k + 1, cyl: 1, X: null });
+  }
+  while (S.booms.length > n) {
+    const k = S.booms.length - 1;
+    S.booms.pop();
+    S.stages.forEach(st => st.geo.pop());
+    for (let i = S.items.length - 1; i >= 0; i--) if (Number(S.items[i].boom) === k + 1) delItem(i);
+    S.stages.pop();
+    const E = S.est;
+    E.Xpin -= E.X[k] - (E.X[k - 1] || 0); E.X.pop(); E.Xsec.pop();
+    E.items = E.items.filter(it => !(it.kind === 'boom' && Number(it.boom) === k + 1));
+    if (E.m > n) E.m = n;
+  }
+  S.ui.det = { s: 0, r: 0, k: 0 };
+}
+function addItem() { S.items.push({ name: '新增重量項目', G: 0, boom: 0 }); S.stages.forEach(st => st.geo.forEach(g => g.li.push(null))); }
+function delItem(i) { S.items.splice(i, 1); S.stages.forEach(st => st.geo.forEach(g => g.li.splice(i, 1))); }
+
+/* ---------------- 繪製：伸臂側視示意（重心位置） ---------------- */
+function drawStage(s, C, mk = 'ar2') {
+  const T = C.eff.tables[s], est = C.eff.mode === 'est', N = S.booms.length;
+  if (!T[0].active || !isNum(T[0].L)) return `<p class="note">需有斷面 ${secName(0)} 的 L 才能繪製示意圖。</p>`;
+  const es = est ? C.eff.st[s] : null;
+  // 位置：est → 以旋轉中心為 0；oem → 以斷面 A 為 0
+  const secX = k => est ? es.xsec[k] : T[0].L - T[k].L;
+  const pinX = est ? es.xpin : T[0].L;
+  const itemsX = C.eff.items.map((it, i) => est ? es.itemX[i] : (isNum(T[0].li[i]) ? T[0].li[i] : NaN));
+  const act = []; for (let k = 0; k < N; k++) if (T[k].active) act.push(k);
+  const ends = act.map((k, i) => act[i + 1] != null ? secX(act[i + 1]) : secX(k) + Math.max(T[k].l0 || 0, T[k].L));
+  const x0 = est ? 0 : 0, x1 = Math.max(pinX, ...ends, ...itemsX.filter(isNum));
+  const W = 1100, ml = est ? 40 : 30, mr = 40, sx = (W - ml - mr) / Math.max(x1 - x0, 1);
+  const maxH = Math.max(...C.geo.map(g => g.err ? 0 : g.H), 1), hs = Math.min(56 / maxH, 1.4);
+  const yc = 92, P = x => ml + (x - x0) * sx;
+  let o = `<svg viewBox="0 0 ${W} 190" font-family="Arial,'Microsoft JhengHei',sans-serif"><defs><marker id="${mk}" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1.5 L10,5 L0,8.5 z" fill="#333"/></marker></defs>`;
+  if (est) {
+    const h0 = (C.geo[0].err ? 20 : C.geo[0].H) * hs;
+    o += `<rect x="${P(0)}" y="${yc - h0 / 2}" width="${(secX(0)) * sx}" height="${h0}" fill="#e8eef6" stroke="#34404f"/>`;
+    o += `<circle cx="${P(0)}" cy="${yc}" r="5" fill="#fff" stroke="#111" stroke-width="1.5"/><text x="${P(0)}" y="${yc + h0 / 2 + 22}" font-size="10.5" text-anchor="middle">旋轉中心 0</text>`;
+  }
+  act.forEach((k, i) => {
+    const a = secX(k), b = ends[i];
+    const hh = (C.geo[k].err ? 20 : C.geo[k].H) * hs;
+    o += `<rect x="${P(a)}" y="${yc - hh / 2}" width="${(b - a) * sx}" height="${hh}" fill="#e8eef6" stroke="#34404f" stroke-width="1"/>`;
+    o += `<line x1="${P(a)}" y1="${yc - hh / 2 - 12}" x2="${P(a)}" y2="${yc + hh / 2 + 12}" stroke="var(--cl)" stroke-width="1.2"/>`;
+    o += `<text x="${P(a)}" y="${yc + hh / 2 + 24}" font-size="11" text-anchor="middle" fill="var(--cl)" font-weight="700">${LET[k]}</text>`;
+    if (est) o += `<text x="${P(a)}" y="${yc + hh / 2 + 36}" font-size="9" text-anchor="middle" fill="var(--cl)">${f(a, 1)}</text>`;
+  });
+  o += `<circle cx="${P(pinX)}" cy="${yc}" r="5" fill="#fff" stroke="#111"/><line x1="${P(pinX)}" y1="${yc + 5}" x2="${P(pinX)}" y2="${yc + 75}" stroke="#111" marker-end="url(#${mk})"/>
+    <text x="${P(pinX) + 6}" y="${yc + 70}" font-size="11">W</text>`;
+  if (est) o += `<text x="${P(pinX)}" y="${yc - 14}" font-size="9" text-anchor="middle">${f(pinX, 1)}</text>`;
+  C.eff.items.forEach((it, i) => {
+    const x = itemsX[i]; if (!isNum(x)) return;
+    const y0 = yc - 56 + (i % 3) * 10;
+    o += `<line x1="${P(x)}" y1="${y0}" x2="${P(x)}" y2="${yc - 4}" stroke="#555" stroke-width=".8" marker-end="url(#${mk})"/><text x="${P(x)}" y="${y0 - 3}" font-size="10" text-anchor="middle">G${i + 1}</text>`;
+  });
+  o += `<text x="${ml}" y="184" font-size="10.5" fill="#5b6675">${est ? '位置以伸臂最底端旋轉中心為基準點（cm）' : `以斷面 ${secName(0)} 為原點，Gi 位置取 ${secName(0)} 欄之 ℓi`}</text></svg>`;
+  return o;
+}
+
+/* ---------------- 版面：1 設計條件 ---------------- */
+function renderDesign() {
+  const d = S.design;
+  let h = `<h2>① 計算標準與設計條件</h2>
+  <div class="card"><div class="grid">
+    <div class="f"><label>計算書名稱</label><input type="text" data-k="project.title" data-t="str" value="${esc(S.project.title)}"></div>
+    <div class="f"><label>機型 MODEL</label><input type="text" data-k="project.model" data-t="str" value="${esc(S.project.model)}" ${locked('project.model') ? 'disabled' : ''}></div>
+    <div class="f"><label>日期</label><input type="text" data-k="project.date" data-t="str" value="${esc(S.project.date)}"></div>
+  </div></div>
+  <div class="card"><h3 style="margin-top:0">伸臂材料與容許應力</h3><div class="grid">
+    ${fld('抗拉強度 σB', 'design.sigB', 'kgf/cm²')}
+    ${fld('降伏應力 σy', 'design.sigY', 'kgf/cm²')}
+    <div class="f"><label>基本容許應力 σa₀ ${isDb() ? '（原廠）' : '= min(σy, 0.75σB) ÷ 1.5'}</label><span class="calc" id="sA0val"></span><span class="u">kgf/cm²</span></div>
+    ${fld('容許應力增加係數（含風荷重組合）', 'design.kA', '')}
+    ${fld('彈性係數 E', 'design.E', 'kgf/cm²')}
+    ${fld('熔接效率 η（有非破壞檢測可取 1.0）', 'design.weldEff', '')}
+    <div class="f"><label>容許拉應力 σa = σa₀ × 係數 × η</label><span class="calc" id="sAval"></span><span class="u">kgf/cm²</span></div>
+    ${fld('壓應力側容許應力除數（σca = σa₀ ÷ 此值 × 係數 × η）', 'design.cDiv', '')}
+    <div class="f"><label>容許壓應力 σca</label><span class="calc" id="sAcval"></span><span class="u">kgf/cm²</span></div>
+  </div>
+  <p class="note">現行移動式起重機構造規格第 3 條：σca = σa / 1.15，例：拉 300 × 1.15 = 345 N/mm²、壓 300 / 1.15 × 1.15 = 300 N/mm²（除數填 1.15）。舊式計算書拉壓同值者，除數填 1。合成應力 σt 與 σa 比較、σc 與 σca 比較。<br>自行計算（非原廠）基本容許應力 σa₀ = min(σy, 0.75σB) ÷ 1.5，由材料值自動計算；材料值依台灣法規認可：抗拉強度 6000、降伏應力 4580、彈性係數 2,100,000 kgf/cm²；熔接效率 η 預帶 0.8，焊道經非破壞檢測者可取 1.0（原廠資料取 1.0）。<br>單位換算：1 N/mm² = 10.197 kgf/cm²（例 345 N/mm² ≈ 3518 kgf/cm²）。</p></div>
+  <div class="card"><h3 style="margin-top:0">荷重係數</h3><div class="grid">
+    ${fld('動荷重係數 ψ₁', 'design.psi1')}
+    ${fld('靜荷重係數 ψ₂', 'design.psi2')}
+    ${fld('水平荷重係數 φ', 'design.phi')}
+    ${fld('風力係數 C', 'design.C')}
+  </div></div>
+  <div class="card"><h3 style="margin-top:0">風荷重</h3><div class="grid">
+    ${fld('速度壓係數（q = 係數×⁴√h）', 'design.qk', 'kgf/m²')}
+    ${fld('受風中心離地高 h（未滿 16 m 以 16 m 計）', 'design.h', 'm')}
+    <div class="f"><label>速度壓 q</label><span class="calc" id="qval"></span><span class="u">kgf/m²</span></div>
+    ${fld('伸臂頭部附加受風面積', 'design.headA', 'm²')}
+  </div>
+  <p class="note">各節伸臂側面受風面積 = 外露長度 × 斷面高 H，由第 4 頁之 L、ℓ₀ 自動計算；受風中心取外露段中點。頭部（滑輪、吊鉤）若需另計，請填附加面積，作用於滑輪銷位置。</p></div>
+  <div class="card"><h3 style="margin-top:0">軸力（伸縮機構）</h3><div class="grid">
+    <div class="f"><label>軸力計算方式</label><select data-k="design.axial" data-t="sel" data-struct="1">
+      <option value="wire" ${d.axial === 'wire' ? 'selected' : ''}>鋼索同步伸縮（原計算書式 (4)~(7)）</option>
+      <option value="none" ${d.axial === 'none' ? 'selected' : ''}>不計軸力（全油壓缸伸縮）</option></select></div>
+    ${fld('吊索掛數 n', 'design.nRope', '掛')}
+  </div>
+  <p class="note">鋼索同步伸縮：最末節及其前兩節承受壓縮軸力（計入挫屈係數 ω），再前一節承受拉力 N = N(末節−1)。須伸臂節數 ≥ 4，且最末節伸出時才計算。</p></div>
+  <div class="card"><h3 style="margin-top:0">挫屈係數 ω</h3><div class="grid">
+    <div class="f"><label>ω 取值方式</label><select data-k="design.omegaMode" data-t="sel" data-struct="1">
+      <option value="formula" ${d.omegaMode !== 'table' && d.omegaMode !== 'code' ? 'selected' : ''}>公式計算</option>
+      <option value="code" ${d.omegaMode === 'code' ? 'selected' : ''}>規定挫屈係數表</option>
+      <option value="table" ${d.omegaMode === 'table' ? 'selected' : ''}>自訂 λ–ω 表（線性內插）</option></select></div>
+    ${d.omegaMode === 'code' ? `<div class="f"><label>別表鋼材級別</label><select data-k="design.omegaCls" data-t="seln" data-struct="1">
+      <option value="0" ${!(d.omegaCls >= 1) ? 'selected' : ''}>依 σy 自動</option>
+      ${OMEGA_CODE.map((c, i) => `<option value="${i + 1}" ${d.omegaCls === i + 1 ? 'selected' : ''}>(${i + 1}) σy ${i ? '> ' + OMEGA_CODE[i - 1].fy + ' ~ ' : '≤ '}${c.fy} N/mm²</option>`).join('')}</select></div>
+    <div class="f"><label>取值欄</label><select data-k="design.omegaRow" data-t="sel" data-struct="1">
+      <option value="up" ${d.omegaRow !== 'lo' ? 'selected' : ''}>上欄：箱形伸臂等鋼管以外之鋼材</option>
+      <option value="lo" ${d.omegaRow === 'lo' ? 'selected' : ''}>下欄：鋼管</option></select></div>
+    <div class="f"><label>目前採用</label><span class="calc" id="omcls"></span><span class="u"></span></div>`
+    : `<div class="f"><label>限界細長比 Λ = √(π²E / 0.6σy)</label><span class="calc" id="lamval"></span><span class="u"></span></div>`}
+  </div>
+  <p class="note">有效細長比 λ = 2ℓ / k<sub>y</sub>（ℓ：該節斷面至下一節斷面或吊點之距離）。<br>查表：依降伏應力 σy 分級，λ < 20 時 ω = 1，整數 λ 之間線性內插；箱形伸臂取上欄，鋼管取下欄。<br>公式：λ ≤ Λ 時 ω = (1.5 + ⅔(λ/Λ)²) / [1.5(1 − 0.4(λ/Λ)²)]；λ > Λ 時 ω = 2.407(λ/Λ)²。</p>`;
+  if (d.omegaMode === 'table') {
+    if (!d.omegaTable) d.omegaTable = defaultOmegaTable();
+    h += `<div class="flex" style="margin:6px 0"><button class="sm" data-act="omAdd">＋ 新增列</button><button class="sm" data-act="omReset">以公式值重設</button></div>
+    <div class="tbl"><table><tr><th>λ</th>${d.omegaTable.map((r, i) => `<td>${ni(`design.omegaTable.${i}.0`)}</td>`).join('')}</tr>
+    <tr><th>ω</th>${d.omegaTable.map((r, i) => `<td>${ni(`design.omegaTable.${i}.1`)}</td>`).join('')}</tr>
+    <tr><th></th>${d.omegaTable.map((r, i) => `<td style="text-align:center"><button class="sm del" data-act="omDel" data-i="${i}">✕</button></td>`).join('')}</tr></table></div>`;
+  }
+  h += `</div>
+  <div class="card"><h3 style="margin-top:0">疲勞檢核</h3><div class="grid">
+    <div class="f"><label><input type="checkbox" data-k="design.fatigueOn" data-t="bool" data-struct="1" ${d.fatigueOn ? 'checked' : ''}> 計算伸臂疲勞（Fatigue life of boom）</label></div>
+    ${fld('鋼材疲勞限', 'design.fatigue', 'kgf/cm²', d.fatigueOn ? '' : 'disabled')}
+  </div>
+  <p class="note">依 S-N 線圖：取全部伸臂合成拉應力 σt 之最大值與鋼板疲勞限比較，未超過即不致疲勞破壞。590 N/mm² 級高張力鋼板疲勞限 353 N/mm²（3600 kgf/cm²）。</p></div>
+  <div class="card"><h3 style="margin-top:0">其他</h3><div class="grid">
+    <div class="f"><label>應力取值</label><select data-k="design.round" data-t="sel" data-struct="1">
+      <option value="ceil" ${d.round === 'ceil' ? 'selected' : ''}>整數無條件進位（同原計算書）</option>
+      <option value="round" ${d.round === 'round' ? 'selected' : ''}>整數四捨五入</option>
+      <option value="dec1" ${d.round === 'dec1' ? 'selected' : ''}>小數一位</option></select></div>
+    <div class="f"><label><input type="checkbox" data-k="design.thetaFromR" data-t="bool" data-struct="1" ${d.thetaFromR ? 'checked' : ''}> 由作業半徑反算伸臂角 θ</label></div>
+    ${fld('　反算用：伸臂腳銷在迴轉中心後方之距離 a', 'design.rOff', 'm', d.thetaFromR ? '' : 'disabled')}
+  </div>
+  <p class="note">反算式 θ = cos⁻¹[(R + a) / 伸臂長]（R = 伸臂長·cosθ − a）；R + a 大於伸臂長時伸臂近水平，取 θ = 0°。未勾選時直接使用性能表輸入之 θ。</p></div>`;
+  $('#p1').innerHTML = h;
+}
+
+/* ---------------- 2 荷重性能表 ---------------- */
+function renderChart() {
+  const N = S.booms.length, d = S.design, D = stageD();
+  const CR = CHART_RO();
+  let h = `<h2>② 荷重性能表${isDb() ? '<span class="lockmark">🔒 資料庫原廠資料</span>' : NOCHART() ? '<span class="lockmark">🔒 無荷重性能表：依斷面強度反算</span>' : CASE_CHART() ? '<span class="lockmark">🔒 依主控台 S1-3 荷重性能表</span>' : ''}</h2>
+  ${NOCHART() ? `<div class="card flex" style="align-items:center"><button class="pri" data-act="fromHub">📥 以 S1-3 帶入伸臂長度</button>
+    <span class="note">沒有原廠荷重性能表：各伸臂長度、各作業半徑之荷重，由斷面尺寸、重量與設計條件反算伸臂強度可承受之荷重（應力比約 0.95，無條件捨去至 5 kg），
+    並與安定度（S4）、原吊升荷重取較小值；S4 計算完成後，此處荷重點即為最終荷重表。</span></div>`
+  : CASE_CHART() ? `<div class="card flex" style="align-items:center"><button class="pri" data-act="fromHub">📥 以 S1-3 荷重表帶入伸臂長度與荷重點</button>
+    <span class="note">伸臂長度與荷重點一律以主控台 S1-3 荷重性能表為準；要修改請回主控台 S1-3 修改後，再按此按鈕帶入。伸臂角由作業半徑反算。</span></div>` : ''}
+  <div class="card flex" style="align-items:center">
+    <b>伸臂節數 / 斷面數</b>
+    ${CR ? '' : '<button data-act="nDec">－</button>'}<span class="calc" style="font-size:18px;min-width:24px;text-align:center">${N}</span>${CR ? '' : '<button data-act="nInc">＋</button>'}
+    <span class="note">伸臂節數 = 伸臂長度段數 = 臨界斷面數（${secName(0)} ~ ${secName(N - 1)}）。增減時會同步增減斷面、伸臂長度段與重心位置資料。</span>
+  </div>
+  <div class="lc-wrap"><div class="card" style="margin:0"><div class="tbl"><table>
+  <tr><th>伸臂長度 (m)</th><th>額定荷重 (kgf)<br><span class="note">含吊具重量</span></th><th>作業半徑 R (m)</th><th>伸臂角 θ (°)</th>${CR ? '' : '<th></th>'}</tr>`;
+  S.stages.forEach((st, s) => {
+    st.rows.forEach((row, r) => {
+      h += `<tr>`;
+      if (r === 0) h += `<td rowspan="${st.rows.length + (CR ? 0 : 1)}" class="grp">${ni(`stages.${s}.len`)} m<div class="note">伸出狀態 d = ${D[s]}${D[s] === 1 ? '（全縮）' : D[s] === N ? '（全伸）' : ''}</div></td>`;
+      h += `<td>${ni(`stages.${s}.rows.${r}.0`)}</td><td>${ni(`stages.${s}.rows.${r}.1`)}</td>
+        <td>${d.thetaFromR ? `<span class="calc" id="thc-${s}-${r}"></span>` : ni(`stages.${s}.rows.${r}.2`)}</td>
+        ${CR ? '' : `<td><button class="sm del" data-act="rowDel" data-s="${s}" data-r="${r}" ${st.rows.length < 2 ? 'disabled' : ''}>✕</button></td>`}</tr>`;
+    });
+    if (!CR) h += `<tr><td colspan="4"><button class="sm" data-act="rowAdd" data-s="${s}">＋ 新增荷重點</button></td></tr>`;
+  });
+  h += `</table></div><p class="note">伸出狀態 d 依伸臂長度由短到長自動排定（d=1 全縮，d=${N} 全伸），供自行計算模式決定各節伸出比例。</p></div>
+  <div class="card lc-side" style="margin:0"><div id="lcPreview"></div>
+    <p class="note">依左側荷重點自動產生。不在列上的半徑點標於最接近的一列並註明實際半徑（如 490 (3.08m)）；最小半徑以內畫斜線。</p></div></div>`;
+  $('#p2').innerHTML = h;
+}
+
+/* ---------------- 吊升荷重表（矩陣） ---------------- */
+function chartRadii() {
+  const txt = (S.chart.radii || '').trim();
+  if (txt) { const v = txt.split(/[,，\s]+/).map(Number).filter(x => isNum(x) && x > 0); if (v.length) return [...new Set(v)].sort((a, b) => a - b); }
+  const all = S.stages.flatMap(st => st.rows.map(r => r[1])).filter(isNum);
+  if (!all.length) return [];
+  const lo = Math.max(0.5, Math.floor(Math.min(...all) * 2) / 2), hi = Math.round(Math.max(...all));
+  const out = [];
+  for (let r = lo; r < 4 - 1e-9; r += 0.5) out.push(+r.toFixed(2));
+  for (let r = Math.max(4, Math.ceil(lo)); r <= hi + 1e-9; r += 1) out.push(r);
+  return out;
+}
+function loadChartHTML() {
+  const rows = chartRadii();
+  const cols = S.stages.map((st, s) => s).filter(s => isNum(S.stages[s].len)).sort((a, b) => S.stages[a].len - S.stages[b].len);
+  const nearest = R => { let bi = 0; rows.forEach((r, i) => { if (Math.abs(r - R) < Math.abs(rows[bi] - R) - 1e-9) bi = i; }); return bi; };
+  const fmtR = r => String(+Number(r).toFixed(3));
+  const grid = cols.map(s => {
+    const pts = S.stages[s].rows.filter(r => isNum(r[0]) && isNum(r[1])).map(r => ({ W: r[0], R: r[1] })).sort((a, b) => a.R - b.R);
+    const cell = rows.map(() => null);
+    if (!pts.length || !rows.length) return cell;
+    const iMin = nearest(pts[0].R), iMax = nearest(pts[pts.length - 1].R);
+    const asg = {}; pts.forEach(p => { const i = nearest(p.R); if (!asg[i] || p.R > asg[i].R) asg[i] = p; });
+    rows.forEach((r, i) => {
+      if (i < iMin) { cell[i] = { x: true }; return; }
+      if (i > iMax) return;
+      const a = asg[i];
+      if (a && Math.abs(a.R - r) > 1e-6) { cell[i] = { W: a.W, note: fmtR(a.R) }; return; }
+      const p = pts.find(q => q.R >= r - 1e-9);
+      cell[i] = p ? { W: p.W } : (a ? { W: a.W } : null);
+    });
+    return cell;
+  });
+  let h = `<div class="lc-title"><b>${esc(S.chart.title || '吊升荷重表')}</b><span>單位：<b>kg</b></span></div>
+  <table class="lc"><thead><tr><th class="corner" rowspan="2"><span class="a">吊桿長度 (m)</span><span class="b">作業半徑 (m)</span></th><th colspan="${cols.length}">吊桿長度（m）</th></tr>
+  <tr>${cols.map(s => `<th>${fmtR(S.stages[s].len)}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach((r, i) => {
+    h += `<tr><td class="r">${fmtR(r)}</td>${grid.map(c => { const v = c[i]; if (!v) return '<td></td>'; if (v.x) return '<td class="x"></td>'; return `<td>${f(v.W, 0)}${v.note ? `<small>(${v.note}m)</small>` : ''}</td>`; }).join('')}</tr>`;
+  });
+  return h + '</tbody></table>';
+}
+
+/* ---------------- 3 伸臂斷面 ---------------- */
+const shapeIcon = sh => {
+  const P = { rect: '4,3 22,3 22,27 4,27', pent: '4,3 22,3 22,22 13,28 4,22', hex: '13,1 22,5 22,24 13,29 4,24 4,5' }[sh];
+  return `<svg width="26" height="30"><polygon points="${P}" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+};
+function renderSections() {
+  const sh = S.shape;
+  const SR = RO() || NOCHART();
+  let h = `<h2>③ 伸臂臨界斷面（薄殼斷面）${RO() ? '<span class="lockmark">🔒 外觀尺寸為資料庫原廠資料；斷面性質依尺寸計算</span>' : NOCHART() ? '<span class="lockmark">🔒 斷面尺寸於主控台 S1-3 輸入</span>' : ''}</h2>
+  <div class="card"><div class="flex" style="align-items:center;justify-content:space-between">
+    <div class="shapes">
+      ${[['rect', '四角形'], ['pent', '五角形（下 V）'], ['hex', '六角形（上下 V）']].map(([k, n]) => `<button class="shape-btn ${sh === k ? 'on' : ''}" data-act="shape" data-v="${k}" ${SR ? 'disabled' : ''}>${shapeIcon(k)}${n}</button>`).join('')}
+    </div>
+    <div class="note">所有斷面共用同一形狀。尺寸單位：cm　比例尺 <span id="sbar"></span></div>
+  </div>
+  <p class="note">斷面視為薄殼：以外輪廓扣除各板依板厚向內偏移之內輪廓，若側板有內折，再加上內折部分計算斷面性質。B、H 為外緣尺寸；內折沿上/下板內側、自側板轉角起算。無法確認是否內折時，可關閉該節「側板內折」，以單純矩形／五邊形／六邊形薄殼計算。</p></div>
+  <div class="secs">`;
+  S.booms.forEach((bm, k) => {
+    const pp = `booms.${k}.sec`;
+    h += `<div class="sec"><div class="draw" id="sv-${k}"></div>
+      <div class="inp"><h4>斷面 ${secName(k)}　<span class="note">${boomName(k)}</span></h4>
+      ${fld('寬 B', pp + '.B', 'cm')}
+      ${fld('高 H', pp + '.H', 'cm')}
+      ${sh === 'hex' ? fld('上傾角 α上', pp + '.at', '°') : ''}
+      ${sh !== 'rect' ? fld('下傾角 α下', pp + '.ab', '°') : ''}
+      ${fld('上板厚 t上', pp + '.tt', 'cm')}
+      ${fld('側板厚 t側', pp + '.ts', 'cm')}
+      ${fld('下板厚 t下', pp + '.tb', 'cm')}
+      <div class="f" style="margin:6px 0 3px"><label style="color:var(--ink);font-weight:600"><input type="checkbox" data-k="${pp}.fold" data-t="bool" data-struct="1" ${bm.sec.fold ? 'checked' : ''} ${SR ? 'disabled' : ''}> 側板內折</label></div>
+      ${bm.sec.fold ? `${fld('上內折 長', pp + '.dtL', 'cm')}
+      ${fld('上內折 厚', pp + '.dtT', 'cm')}
+      ${fld('下內折 長', pp + '.dbL', 'cm')}
+      ${fld('下內折 厚', pp + '.dbT', 'cm')}` : '<div class="note" style="margin-bottom:4px">無內折（單純薄殼）</div>'}
+      <div id="sp-${k}"></div></div></div>`;
+  });
+  h += `</div><h3>表 1　各斷面之斷面性質</h3><div class="card"><div class="tbl" id="t1"></div></div>`;
+  $('#p3').innerHTML = h;
+}
+
+/* ---------------- 4 重量與重心位置 ---------------- */
+function renderGeo() {
+  const mode = S.geoMode;
+  let h = `<h2>④ 伸臂重量與重心位置${RO() ? '<span class="lockmark">🔒 資料庫原廠資料</span>' : ''}</h2>
+  <p class="note">${mode === 'oem' ? `重量與重心距離（表 2 之 L、ℓ₀、ℓi）採 ${esc(S.project.model)} 原廠計算書數據。` : '自行計算：輸入以伸臂最底端旋轉中心為基準點之各部位置，程式依各伸臂長度之伸出比例推算重心，以 ℓ = x − x<sub>斷面</sub> 求得力臂。'}</p>
+  <p class="note">各節伸臂單位長重量 w 列於表 1（${isDb() ? '原廠資料' : '由斷面積計算'}）；斷面外側本節伸臂以均布自重 ½·w·ℓ₀² 計，其他節伸臂以集中重量 Gi 計入。</p>`;
+  h += mode === 'est' ? geoEstInputs() : geoOemInputs();
+  $('#p4').innerHTML = h;
+}
+function geoOemInputs() {
+  let h = `<div class="card"><h3 style="margin-top:0">集中重量 Gi</h3><div class="tbl"><table>
+  <tr><th>代號</th><th>名稱</th><th>重量 (kgf)</th><th>所屬伸臂<br><span class="note">供軸力計算</span></th><th></th></tr>`;
+  S.items.forEach((it, i) => {
+    h += `<tr><td style="text-align:center">G${i + 1}</td><td><input type="text" data-k="items.${i}.name" data-t="str" value="${esc(it.name)}" ${RO() ? 'disabled' : ''}></td>
+      <td>${ni(`items.${i}.G`)}</td>
+      <td><select data-k="items.${i}.boom" data-t="seln" ${RO() ? 'disabled' : ''}><option value="0">—</option>${S.booms.map((_, k) => `<option value="${k + 1}" ${Number(it.boom) === k + 1 ? 'selected' : ''}>${boomName(k)}</option>`).join('')}</select></td>
+      <td>${RO() ? '' : `<button class="sm del" data-act="itemDel" data-i="${i}">✕</button>`}</td></tr>`;
+  });
+  h += `</table></div>${RO() ? '' : '<button class="sm" data-act="itemAdd" style="margin-top:6px">＋ 新增重量項目</button>'}</div>
+  <h3>表 2　L 與 ℓi 之值（單位：cm）</h3>
+  <p class="note">L：斷面至頂端滑輪銷距離；ℓ₀：斷面至本節伸臂頂端距離；ℓi：斷面至 Gi 重心距離。留空 = 不計入。該段某斷面 L 留空表示此斷面不外露、不計算。</p>`;
+  S.stages.forEach((st, s) => {
+    h += `<div class="card stage"><div class="stage-h"><b>伸臂長 ${f(st.len, 2)} m</b></div>
+    <div class="tbl"><table><tr><th>項目</th>${S.booms.map((_, k) => `<th>${secName(k)}</th>`).join('')}</tr>
+    <tr><th>L</th>${S.booms.map((_, k) => `<td>${ni(`stages.${s}.geo.${k}.L`)}</td>`).join('')}</tr>
+    <tr><th>ℓ₀</th>${S.booms.map((_, k) => `<td>${ni(`stages.${s}.geo.${k}.l0`)}</td>`).join('')}</tr>
+    ${S.items.map((it, i) => `<tr><th style="text-align:left">ℓ${i + 1} <span class="note">G${i + 1} ${esc(it.name)}</span></th>${S.booms.map((_, k) => `<td>${ni(`stages.${s}.geo.${k}.li.${i}`)}</td>`).join('')}</tr>`).join('')}
+    </table></div><div class="geo-svg" id="geo-${s}"></div></div>`;
+  });
+  return h;
+}
+function geoEstInputs() {
+  const E = S.est, N = S.booms.length;
+  let h = `<div class="card"><h3 style="margin-top:0">伸縮機構</h3><div class="grid">
+    ${fld('伸縮油壓缸數量 m', 'est.m', '支', 'min="1" step="1"')}
+  </div>
+  <p class="note">第 2 ~ m 節依序由油壓缸 1 ~ m−1 伸出；最後一支油壓缸 m 以鋼索帶動滑輪，使第 m+1 ~ ${N} 節同步伸縮（伸出比例 = (d − m)/(n − m)）。目前：${S.booms.map((_, k) => k === 0 ? '' : `${boomName(k)} ${k + 1 <= E.m ? '單獨' : '同步'}`).filter(Boolean).join('、')}</p></div>
+  <div class="card"><h3 style="margin-top:0">全伸時各部位置（自旋轉中心起算，cm）</h3><div class="tbl"><table>
+  <tr><th>項目</th>${S.booms.map((_, k) => `<th>${boomName(k)} / ${secName(k)}</th>`).join('')}</tr>
+  <tr><th style="text-align:left">伸臂頭端位置 X<sub>k</sub></th>${S.booms.map((_, k) => `<td>${ni(`est.X.${k}`)}</td>`).join('')}</tr>
+  <tr><th style="text-align:left">外露長 = X<sub>k</sub> − X<sub>k−1</sub></th>${S.booms.map((_, k) => `<td class="n ro" id="seg-${k}"></td>`).join('')}</tr>
+  <tr><th style="text-align:left">斷面位置 x<sub>斷面</sub></th>${S.booms.map((_, k) => `<td>${ni(`est.Xsec.${k}`)}</td>`).join('')}</tr>
+  </table></div>
+  <div class="grid" style="margin-top:8px">${fld('頂端滑輪銷位置 X<sub>pin</sub>（全伸）', 'est.Xpin', 'cm')}</div>
+  <p class="note">斷面 ${secName(0)} 固定於第 1 節；斷面 ${secName(1)} 起位於前一節伸臂頭端附近，隨前一節一起移動。滑輪銷隨最末節移動。各段之位置 = 全伸位置 − 該節縮回量。</p></div>
+  <div class="card"><h3 style="margin-top:0">集中重量 Gi 與重心位置取法</h3><div class="tbl"><table>
+  <tr><th>代號</th><th>名稱</th><th>重量 (kgf)</th><th>種類</th><th>對應</th><th>全伸時位置 x（附掛物）</th><th></th></tr>`;
+  E.items.forEach((it, i) => {
+    const sel = (opts, path, val) => `<select data-k="${path}" data-t="seln">${opts.map(([v, t]) => `<option value="${v}" ${Number(val) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+    const boomOpts = S.booms.map((_, k) => [k + 1, boomName(k)]);
+    h += `<tr><td style="text-align:center">G${i + 1}</td><td><input type="text" data-k="est.items.${i}.name" data-t="str" value="${esc(it.name)}"></td>
+      <td>${ni(`est.items.${i}.G`)}</td>
+      <td><select data-k="est.items.${i}.kind" data-t="sel" data-struct="1">
+        <option value="boom" ${it.kind === 'boom' ? 'selected' : ''}>伸臂自重</option>
+        <option value="cyl" ${it.kind === 'cyl' ? 'selected' : ''}>伸縮油壓缸</option>
+        <option value="att" ${it.kind === 'att' ? 'selected' : ''}>附掛物</option></select></td>
+      <td>${it.kind === 'cyl' ? sel(Array.from({ length: Math.max(E.m, 1) }, (_, c) => [c + 1, `油壓缸 ${c + 1}`]), `est.items.${i}.cyl`, it.cyl)
+        : it.kind === 'att' ? sel([[0, '固定（第1節）'], ...boomOpts.slice(1).map(([v, t]) => [v, `隨 ${t}`])], `est.items.${i}.boom`, it.boom)
+        : sel(boomOpts, `est.items.${i}.boom`, it.boom)}</td>
+      <td>${it.kind === 'att' ? ni(`est.items.${i}.X`) : '<span class="note">自動</span>'}</td>
+      <td><button class="sm del" data-act="estDel" data-i="${i}">✕</button></td></tr>`;
+  });
+  h += `</table></div><button class="sm" data-act="estAdd" style="margin-top:6px">＋ 新增重量項目</button>
+  <p class="note"><b>重心位置取法</b>（同「安定度計算」附件1）：<br>
+  ・伸臂自重：外露段之型心 x = X頭端 − 外露長/2，即 (L<sub>k</sub> − L<sub>k−1</sub>)/2 + L<sub>k−1</sub>（隱藏於前一節內之長度無法量測，故取外露型心）。<br>
+  ・伸縮油壓缸 c：x = [(第 c 節頭端 − 第 c 節外露長) + 第 c+1 節頭端] / 2；油壓缸 1 於第 2 節全伸時約為 L₂/2。<br>
+  ・附掛物：輸入全伸時位置，隨所屬伸臂移動。<br>
+  ・計算力臂 ℓi = x − x<sub>斷面</sub>，僅計入位於斷面外側（ℓ &gt; 0）者；斷面所屬伸臂本身以 ½·w·ℓ₀² 計。</p></div>
+  <h3>各伸臂長度段之位置與 L、ℓi（自動計算，cm）</h3>
+  <div id="estOut"></div>`;
+  return h;
+}
+function estOutHTML(C, editable = true) {
+  const E = S.est, N = S.booms.length, items = E.items;
+  let h = '';
+  S.stages.forEach((st, s) => {
+    const es = C.eff.st[s], T = es.tables;
+    const diff = es.len - st.len;
+    h += `<div class="card stage blk"><div class="stage-h"><b>伸臂長 ${f(st.len, 2)} m</b><span class="note">伸出狀態 d = ${es.d}</span>
+      <span class="${Math.abs(diff) > 0.05 ? 'warn' : 'note'}">推算伸臂長（旋轉中心至滑輪銷）= ${f(es.len, 2)} m${Math.abs(diff) > 0.05 ? `（與性能表差 ${f(diff, 2)} m）` : ''}</span></div>
+    <div class="tbl"><table><tr><th>項目</th>${S.booms.map((_, k) => `<th>${secName(k)}</th>`).join('')}</tr>
+    <tr><th style="text-align:left">伸出比例</th>${es.r.map(r => `<td class="n">${f(r, 3)}</td>`).join('')}</tr>
+    <tr><th style="text-align:left">伸臂頭端 x</th>${es.tip.map(t => `<td class="n">${f(t, 1)}</td>`).join('')}</tr>
+    <tr><th style="text-align:left">斷面位置 x<sub>斷面</sub></th>${S.booms.map((_, k) => T[k].active ? `<td class="n">${f(es.xsec[k], 1)}</td>` : '<td class="na"></td>').join('')}</tr>
+    <tr><th style="text-align:left">L = x<sub>pin</sub>(${f(es.xpin, 1)}) − x<sub>斷面</sub></th>${T.map(t => t.active ? `<td class="n">${f(t.L, 1)}</td>` : '<td class="na"></td>').join('')}</tr>
+    <tr><th style="text-align:left">ℓ₀ = x頭端 − x<sub>斷面</sub></th>${T.map(t => t.active ? `<td class="n">${f(t.l0, 1)}</td>` : '<td class="na"></td>').join('')}</tr>
+    ${items.map((it, i) => `<tr><th style="text-align:left">ℓ${i + 1} <span class="note">G${i + 1} ${esc(it.name)}　x=${f(es.itemX[i], 1)}</span></th>${T.map(t => t.active ? `<td class="n">${isNum(t.li[i]) ? f(t.li[i], 1) : ''}</td>` : '<td class="na"></td>').join('')}</tr>`).join('')}
+    </table></div>${editable ? `<div class="geo-svg" id="geo-${s}"></div>` : `<div class="geo-svg">${drawStage(s, C, 'pa' + s)}</div>`}</div>`;
+  });
+  return h;
+}
+
+/* ---------------- 5 計算結果 ---------------- */
+function resultTable(C, title, sub, cell, print, only) {
+  const sa = sigA();
+  let h = `<h3>${title}</h3>${print ? '' : '<div class="card">'}<div class="tbl"><table><thead><tr><th rowspan="2">伸臂長<br>(m)</th><th rowspan="2">額定荷重<br>(kgf)</th><th rowspan="2">半徑<br>(m)</th><th rowspan="2">θ</th>`;
+  h += S.booms.map((_, k) => `<th colspan="${sub.length}">${LET[k]}</th>`).join('') + '</tr><tr>';
+  h += S.booms.map(() => sub.map(x => `<th>${x}</th>`).join('')).join('') + '</tr></thead><tbody>';
+  C.res.forEach((sr, s) => {
+    if (only && !only.includes(s)) return;
+    const st = S.stages[s];
+    sr.rows.forEach((row, r) => {
+      h += '<tr>';
+      if (r === 0) h += `<td rowspan="${sr.rows.length}" class="grp">${f(st.len, 2)}</td>`;
+      h += `<td class="n">${f(row.W, 0)}</td><td class="n">${f(row.R, 3)}</td><td class="n">${isNum(row.th) ? f(row.th, 1) + '°' : '<span class="err">?</span>'}</td>`;
+      row.secs.forEach(sc => {
+        if (!sc.active) { h += sub.map(() => '<td class="na"></td>').join(''); return; }
+        if (sc.bad || !sc.R) { h += sub.map(() => '<td class="n err">錯誤</td>').join(''); return; }
+        h += cell(sc, sa);
+      });
+      h += '</tr>';
+    });
+  });
+  return h + `</tbody></table></div>${print ? '' : '</div>'}`;
+}
+const c2 = (v, ng) => `<td class="n ${ng ? 'ng' : ''}">${v == null ? '' : fs(v)}</td>`;
+const naC = '<td class="na"></td>';
+const TABLES = [
+  ['表 3　垂直荷重所生彎曲應力（σ₁ 拉側、σ₁′ 壓側）', ['σ₁', 'σ₁′'], sc => c2(sc.R.s1) + c2(sc.R.s1c)],
+  ['表 4　軸力所生應力（σ₂ 拉側、σ₂′ 壓側）', ['σ₂', 'σ₂′'], sc => sc.R.s2 == null ? naC + naC : c2(sc.R.s2) + c2(sc.R.s2c), 'axial'],
+  ['表 5　水平荷重所生彎曲應力 σ₃', ['σ₃'], sc => c2(sc.R.s3)],
+  ['表 6　風荷重所生彎曲應力 σ₄', ['σ₄'], sc => c2(sc.R.s4)],
+  ['表 7　合成應力（σt 拉側、σc 壓側）', ['σt', 'σc'], sc => c2(sc.st, sc.st > sigA()) + c2(sc.sc, sc.sc > sigAc())]
+];
+const tblOn = cond => cond === 'axial' ? S.design.axial === 'wire' : true;
+/* 疲勞檢核摘要 */
+function extraSummary(C, print) {
+  const d = S.design; let h = '';
+  if (C.fat) h += `<h3>疲勞檢核</h3><table><tbody><tr><th>伸臂最大合成拉應力 σt</th><td class="n">${fs(C.fat.t)} kgf/cm²</td><td class="note">${boomName(C.fat.k)}，${caseTxt(C.fat.at)}</td></tr>
+    <tr><th>鋼材疲勞限</th><td class="n">${f(d.fatigue, 0)} kgf/cm²</td><td>${C.fat.ok ? '未超過疲勞限，不致發生疲勞破壞' : '超過疲勞限'}　<span class="badge ${C.fat.ok ? 'ok' : 'ng'}">${C.fat.ok ? 'OK' : 'NG'}</span></td></tr></tbody></table>`;
+  return h;
+}
+const caseTxt = c => c ? `${f(S.stages[c.s].len, 2)} m／${f(S.stages[c.s].rows[c.r][0], 0)} kgf／R ${f(S.stages[c.s].rows[c.r][1], 2)} m` : '';
+function summaryTable(C, print) {
+  const sa = sigA(), sac = sigAc();
+  let h = `<table><thead><tr><th>伸臂</th><th>斷面</th><th>最大拉應力 σt</th><th>發生條件</th><th>最大壓應力 σc</th><th>發生條件</th><th>應力比</th><th>判定</th></tr></thead><tbody>`;
+  C.sum.forEach((m, k) => {
+    if (m.tc == null) { h += `<tr><td>${boomName(k)}</td><td>${secName(k)}</td><td colspan="6" class="note">無計算資料</td></tr>`; return; }
+    const ng = m.u > 1;
+    h += `<tr><td>${boomName(k)}</td><td>${secName(k)}</td><td class="n ${m.t > sa ? 'ng' : ''}">${fs(m.t)}</td><td class="note">${caseTxt(m.tc)}</td>
+      <td class="n ${m.c > sac ? 'ng' : ''}">${fs(m.c)}</td><td class="note">${caseTxt(m.cc)}</td>
+      <td>${print ? `<div style="text-align:right">${f(m.u, 3)}</div>` : `<div class="flex" style="align-items:center;gap:6px;flex-wrap:nowrap"><div class="bar"><i class="${ng ? 'ng' : ''}" style="width:${Math.min(m.u, 1) * 100}%"></i></div><span>${f(m.u, 3)}</span></div>`}</td>
+      <td style="text-align:center"><span class="badge ${ng ? 'ng' : 'ok'}">${ng ? 'NG' : 'OK'}</span></td></tr>`;
+  });
+  return h + '</tbody></table>';
+}
+function renderResults(C) {
+  const sa = sigA();
+  let h = `<h2>⑤ 計算結果</h2>
+  <div class="verdict ${C.ok ? 'ok' : 'ng'}">${C.ok ? '✔ 各項應力均未超過容許值' : '✘ 有應力超過容許值或輸入有誤'}
+    <span style="font-weight:400;font-size:14px">容許應力 拉 σa = ${f(sigA0(), 0)} × ${S.design.kA}${weld() !== 1 ? ' × ' + weld() : ''} = <b>${f(sa, 0)}</b>${S.design.cDiv !== 1 ? `、壓 σca = <b>${f(sigAc(), 0)}</b>` : ''} kgf/cm²　最大應力比 ${f(C.maxU, 3)}　重心資料：${C.eff.mode === 'est' ? '自行計算推算' : '原廠資料'}</span></div>
+  ${C.errs.length ? `<div class="card err">${C.errs.join('<br>')}</div>` : ''}
+  <h3>各斷面最大應力</h3><div class="card"><div class="tbl">${summaryTable(C)}</div><p class="note">應力單位 kgf/cm²。應力比 = max(σt / σa, σc / σca)。</p></div>
+  ${C.fat ? `<div class="card"><div class="tbl">${extraSummary(C)}</div></div>` : ''}`;
+  TABLES.forEach(([t, sub, cell, cond]) => { if (tblOn(cond)) h += resultTable(C, t, sub, cell); });
+  $('#p5').innerHTML = h;
+}
+
+/* ---------------- 6 計算明細 ---------------- */
+function renderDetailShell() {
+  const u = S.ui.det;
+  if (u.s >= S.stages.length) u.s = 0;
+  if (u.r >= S.stages[u.s].rows.length) u.r = 0;
+  if (u.k >= S.booms.length) u.k = 0;
+  $('#p6').innerHTML = `<h2>⑥ 計算明細（代入式）</h2>
+  <div class="card flex" style="align-items:center">
+    <label>伸臂長 <select id="dS">${S.stages.map((st, s) => `<option value="${s}" ${u.s === s ? 'selected' : ''}>${f(st.len, 2)} m</option>`).join('')}</select></label>
+    <label>荷重點 <select id="dR">${S.stages[u.s].rows.map((r, i) => `<option value="${i}" ${u.r === i ? 'selected' : ''}>${f(r[0], 0)} kgf／R ${f(r[1], 3)} m</option>`).join('')}</select></label>
+    <label>斷面 <select id="dK">${S.booms.map((_, k) => `<option value="${k}" ${u.k === k ? 'selected' : ''}>${secName(k)}</option>`).join('')}</select></label>
+    <button class="sm" data-act="govern">跳至此斷面控制條件</button>
+  </div><div class="card formula" id="detail"></div>`;
+}
+function detailHTML(C, s, r, k) {
+  const d = S.design;
+  const st = S.stages[s], row = C.res[s] && C.res[s].rows[r], sc = row && row.secs[k], g = C.geo[k], bm = S.booms[k];
+  if (!row || !sc || !sc.active) return `<p class="note">此伸臂長度下斷面 ${secName(k)} 不外露，不需計算。</p>`;
+  if (!sc.R) return `<p class="err">輸入資料有誤（斷面或荷重點），無法計算。${g.err ? esc(g.err) : ''}</p>`;
+  const sa = sigA(), sac = sigAc(), est = C.eff.mode === 'est', es = est ? C.eff.st[s] : null, items = C.eff.items;
+  let h = `<h4>條件</h4><div class="eq">伸臂長 ${f(st.len, 2)} m，額定荷重 W = ${f(row.W, 0)} kgf，作業半徑 ${f(row.R, 3)} m，θ = ${f(row.th, 2)}°（cos θ = ${f(row.c, 5)}，sin θ = ${f(row.sn, 5)}）</div>
+  <div class="eq">斷面 ${secName(k)}：A = ${f(g.A, 2)} cm²，I<sub>x</sub> = ${f(g.Ix, 1)} cm⁴，I<sub>y</sub> = ${f(g.Iy, 1)} cm⁴，Z<sub>x1</sub> = ${f(g.Zx1, 2)}，Z<sub>x2</sub> = ${f(g.Zx2, 2)}，Z<sub>y</sub> = ${f(g.Zy, 2)} cm³，k<sub>y</sub> = ${f(g.ky, 2)} cm</div>`;
+  if (est) h += `<div class="eq">位置（自旋轉中心）：x<sub>斷面</sub> = ${f(es.xsec[k], 1)} cm，x<sub>pin</sub> = ${f(es.xpin, 1)} cm，本節頭端 = ${f(es.tip[k], 1)} cm</div>
+  <div class="eq">L = x<sub>pin</sub> − x<sub>斷面</sub> = ${f(es.xpin, 1)} − ${f(es.xsec[k], 1)} = ${f(sc.L, 1)} cm，ℓ₀ = ${f(es.tip[k], 1)} − ${f(es.xsec[k], 1)} = ${f(sc.l0, 1)} cm，w = ${f(sc.w, 3)} kgf/cm</div>`;
+  else h += `<div class="eq">L = ${f(sc.L, 1)} cm，ℓ₀ = ${f(sc.l0, 1)} cm，w = ${f(sc.w, 3)} kgf/cm</div>`;
+  h += `<h4>2-1 垂直荷重所生彎曲應力</h4>`;
+  if (sc.terms.length) {
+    h += `<div class="eq"><table><thead><tr><th>Gi</th><th>名稱</th><th>G (kgf)</th>${est ? '<th>x (cm)</th>' : ''}<th>ℓi${est ? ' = x − x<sub>斷面</sub>' : ''} (cm)</th><th>ℓi·Gi (kgf·cm)</th></tr></thead><tbody>
+    ${sc.terms.map(([i, l, G]) => `<tr><td>G${i + 1}</td><td>${esc(items[i].name)}</td><td class="n">${f(G, 0)}</td>${est ? `<td class="n">${f(es.itemX[i], 1)}</td>` : ''}<td class="n">${f(l, 1)}</td><td class="n">${f(l * G, 1)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+  h += `<div class="eq">Σℓi·Gi = <span class="r">${f(sc.SG, 1)}</span> kgf·cm　　½·w·ℓ₀² = ½ × ${f(sc.w, 3)} × ${f(sc.l0, 1)}² = <span class="r">${f(sc.Dw, 1)}</span> kgf·cm</div>
+  <div class="eq">M<sub>x</sub> = {ψ₁·W·L + ψ₂(Σℓi·Gi + ½·w·ℓ₀²)} cos θ = {${d.psi1} × ${f(row.W, 0)} × ${f(sc.L, 1)} + ${d.psi2} × (${f(sc.SG, 1)} + ${f(sc.Dw, 1)})} × ${f(row.c, 5)} = <span class="r">${f(sc.Mx, 0)}</span> kgf·cm　…(3)</div>
+  <div class="eq">σ₁ = M<sub>x</sub> / Z<sub>x1</sub> = ${f(sc.Mx, 0)} / ${f(g.Zx1, 2)} = ${f(sc.s1, 2)} → <span class="r">${fs(sc.R.s1)}</span> kgf/cm²（拉側）…(1)</div>
+  <div class="eq">σ₁′ = M<sub>x</sub> / Z<sub>x2</sub> = ${f(sc.Mx, 0)} / ${f(g.Zx2, 2)} = ${f(sc.s1c, 2)} → <span class="r">${fs(sc.R.s1c)}</span> kgf/cm²（壓側）…(2)</div>`;
+  h += `<h4>2-2 軸力所生應力</h4>`;
+  if (row.ax && sc.axd) {
+    const t = S.booms.length - 1, a = row.ax;
+    h += `<div class="eq">最末節 ${boomName(t)}：N = (ψ₁·W + ψ₂·G)·sin θ + ψ₁·W/n = (${d.psi1}×${f(row.W, 0)} + ${d.psi2}×${f(a[t].G, 0)})×${f(row.sn, 5)} + ${d.psi1}×${f(row.W, 0)}/${d.nRope} = <span class="r">${f(a[t].N, 1)}</span> kgf　…(7)</div>
+    <div class="eq">${boomName(t - 1)}：N = 2·N${t + 1} + ψ₂·G·sin θ = 2×${f(a[t].N, 1)} + ${d.psi2}×${f(a[t - 1].G, 0)}×${f(row.sn, 5)} = <span class="r">${f(a[t - 1].N, 1)}</span> kgf　…(6)</div>
+    <div class="eq">${boomName(t - 2)}：N = 2·N${t} − N${t + 1} + ψ₂·G·sin θ = 2×${f(a[t - 1].N, 1)} − ${f(a[t].N, 1)} + ${d.psi2}×${f(a[t - 2].G, 0)}×${f(row.sn, 5)} = <span class="r">${f(a[t - 2].N, 1)}</span> kgf　…(5)</div>
+    <div class="eq">${boomName(t - 3)}（拉力）：N = N${t} = <span class="r">${f(a[t - 3].N, 1)}</span> kgf　…(4)</div>`;
+    const x = sc.axd;
+    if (x.comp) h += `<div class="eq">本斷面（壓縮）：λ = 2ℓ / k<sub>y</sub> = 2 × ${f(x.lb, 1)} / ${f(g.ky, 2)} = ${f(x.lam, 2)}，ω = <span class="r">${f(x.om, 3)}</span></div>
+      <div class="eq">σ₂ = −N / A = −${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2)}</span>　σ₂′ = ω·N / A = ${f(x.om, 3)} × ${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2c)}</span> kgf/cm²</div>`;
+    else h += `<div class="eq">本斷面（拉伸）：σ₂ = N / A = ${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2)}</span>　σ₂′ = −N / A = <span class="r">${fs(sc.R.s2c)}</span> kgf/cm²</div>`;
+  } else h += `<div class="eq note">本斷面於此條件不計軸力。</div>`;
+  h += `<h4>2-3 水平荷重所生彎曲應力</h4>
+  <div class="eq">M<sub>y</sub> = φ(W·L + ΣGi·ℓi + ½·w·ℓ₀²) cos θ = ${d.phi} × (${f(row.W, 0)} × ${f(sc.L, 1)} + ${f(sc.SG, 1)} + ${f(sc.Dw, 1)}) × ${f(row.c, 5)} = <span class="r">${f(sc.My, 0)}</span> kgf·cm　…(20)</div>
+  <div class="eq">σ₃ = M<sub>y</sub> / Z<sub>y</sub> = ${f(sc.My, 0)} / ${f(g.Zy, 2)} = ${f(sc.s3, 2)} → <span class="r">${fs(sc.R.s3)}</span> kgf/cm²　…(19)</div>
+  <h4>2-4 風荷重所生彎曲應力</h4>
+  <div class="eq">q = ${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(sc.wind.q, 2)} kgf/m²，Wg = q·C·A = ${f(sc.wind.q, 2)} × ${d.C} × A　…(23)</div>
+  <div class="eq"><table><thead><tr><th>受風段</th><th>外露長 (cm)</th><th>高 H (cm)</th><th>面積 A (m²)</th><th>Wg (kgf)</th><th>ℓi (cm)</th><th>Wg·ℓi (kgf·cm)</th></tr></thead><tbody>
+  ${sc.wind.segs.map(x => `<tr><td>${x.j < 0 ? '頭部附加' : boomName(x.j)}</td><td class="n">${x.j < 0 ? '' : f(x.len, 1)}</td><td class="n">${x.j < 0 ? '' : f(x.H, 2)}</td><td class="n">${f(x.Am, 4)}</td><td class="n">${f(x.Wg, 2)}</td><td class="n">${f(x.arm, 1)}</td><td class="n">${f(x.M, 0)}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="eq">M<sub>w</sub> = ΣWgi·ℓi = <span class="r">${f(sc.wind.M, 0)}</span> kgf·cm　…(22)　σ₄ = M<sub>w</sub> / Z<sub>y</sub> = ${f(sc.wind.M, 0)} / ${f(g.Zy, 2)} = ${f(sc.s4, 2)} → <span class="r">${fs(sc.R.s4)}</span> kgf/cm²　…(21)</div>
+  <h4>2-5 合成應力</h4>
+  <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄ = ${fs(sc.R.s1)} + (${fs(sc.R.s2 || 0)}) + ${fs(sc.R.s3)} + ${fs(sc.R.s4)} = <span class="r">${fs(sc.st)}</span> kgf/cm² ${sc.st <= sa ? '≤' : '>'} ${f(sa, 0)}　<span class="badge ${sc.st <= sa ? 'ok' : 'ng'}">${sc.st <= sa ? 'OK' : 'NG'}</span>　…(24)</div>
+  <div class="eq">σc = σ₁′ + σ₂′ + σ₃ + σ₄ = ${fs(sc.R.s1c)} + (${fs(sc.R.s2c || 0)}) + ${fs(sc.R.s3)} + ${fs(sc.R.s4)} = <span class="r">${fs(sc.sc)}</span> kgf/cm² ${sc.sc <= sac ? '≤' : '>'} ${f(sac, 0)}　<span class="badge ${sc.sc <= sac ? 'ok' : 'ng'}">${sc.sc <= sac ? 'OK' : 'NG'}</span>　…(25)</div>`;
+  return h;
+}
+
+/* ---------------- A4 列印版 ---------------- */
+const PRINT_SCALES = [1, 2, 2.5, 4, 5, 10, 20, 25, 50];
+function buildPrint() {
+  const C = compute(), d = S.design, P = S.project, N = S.booms.length, sa = sigA();
+  const ph = (t) => `<div class="ph"><span>${esc(P.title)}　MODEL：${esc(P.model)}</span><span>${t}</span></div>`;
+  let o = '';
+  // --- 封面 ---
+  o += `<div class="sheet">${ph('伸臂強度計算書')}
+    <div class="cover"><div class="t1">伸臂強度計算書</div><div class="t2">STRENGTH CALCULATION SHEET FOR BOOM</div>
+    <div class="t2" style="margin-top:18mm">${esc(P.title)}</div><div class="t2">MODEL：${esc(P.model)}</div>
+    <div class="t2" style="font-size:10.5pt;margin-top:20mm">日期：${esc(P.date)}</div></div>
+    <h2>目錄</h2><div class="kv"><span>1. 計算標準與結果</span><span></span><span>2. 伸臂強度計算方法</span><span></span><span>3. 臨界斷面形狀與斷面性質</span><span>圖 1、表 1</span>
+    <span>4. 重量與重心位置</span><span>表 2</span><span>5. 應力計算結果</span><span>表 3 ~ 表 7</span>${$('#pvDetail').checked ? '<span>6. 控制條件計算明細</span><span></span>' : ''}<span>附錄　吊升荷重表</span><span>最後一頁</span></div></div>`;
+  // --- 1 計算標準與結果 ---
+  const maxW = Math.max(...S.stages.flatMap(st => st.rows.map(r => r[0])).filter(isNum));
+  o += `<div class="sheet">${ph('1. 計算標準與結果')}
+    <h2>1. 計算標準與結果（Strength Calculation Standards and Results）</h2>
+    <p>本計算書依移動式起重機構造規格及 JIS B 8821 起重機鋼構造部分計算基準，驗算各節伸臂臨界斷面之應力不超過容許應力。</p>
+    <div class="kv"><span>最大額定荷重</span><span>${f(maxW, 0)} kgf</span><span>動荷重係數 ψ₁</span><span>${d.psi1}</span><span>靜荷重係數 ψ₂</span><span>${d.psi2}</span>
+    <span>水平荷重係數 φ</span><span>${d.phi}</span><span>風力係數 C</span><span>${d.C}</span><span>速度壓 q</span><span>${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(qWind(), 2)} kgf/m²</span>
+    <span>吊索掛數 n</span><span>${d.nRope}</span><span>軸力</span><span>${d.axial === 'wire' ? '鋼索同步伸縮（式 4~7）' : '不計'}</span>
+    <span>重心位置資料</span><span>${C.eff.mode === 'est' ? '自行計算（依伸臂長度推算，以旋轉中心為基準點）' : `原廠計算書（${esc(S.project.model)}）`}</span></div>
+    <h3>伸臂材料</h3>
+    <div class="kv"><span>抗拉強度 σB</span><span>${f(d.sigB, 0)} kgf/cm² 以上</span><span>降伏應力 σy</span><span>${f(d.sigY, 0)} kgf/cm² 以上</span>
+    <span>彈性係數 E</span><span>${f(d.E, 0)} kgf/cm²</span>${weld() !== 1 ? `<span>熔接效率 η</span><span>${weld()}</span>` : ''}${isDb() ? '' : `<span>基本容許應力 σa₀</span><span>min(${f(d.sigY, 0)}, 0.75 × ${f(d.sigB, 0)}) ÷ 1.5 = ${f(sigA0(), 0)} kgf/cm²</span>`}<span>容許拉應力 σa</span><span>${f(sigA0(), 0)} × ${d.kA}${weld() !== 1 ? ' × ' + weld() : ''} = ${f(sa, 0)} kgf/cm²</span>
+    ${d.cDiv !== 1 ? `<span>容許壓應力 σca</span><span>${f(sigA0(), 0)} / ${d.cDiv} × ${d.kA}${weld() !== 1 ? ' × ' + weld() : ''} = ${f(sigAc(), 0)} kgf/cm²</span>` : ''}
+    ${d.fatigueOn ? `<span>疲勞限</span><span>${f(d.fatigue, 0)} kgf/cm²</span>` : ''}
+</div>
+    <h3>各斷面最大應力（單位 kgf/cm²）</h3>${summaryTable(C, true)}
+    ${extraSummary(C, true)}
+    <p style="font-weight:700">結論：${C.ok ? `各節伸臂臨界斷面之合成應力均未超過容許應力${d.cDiv !== 1 ? `（拉 ${f(sa, 0)}、壓 ${f(sigAc(), 0)} kgf/cm²）` : ` ${f(sa, 0)} kgf/cm²`}${C.fat ? '，最大應力未超過疲勞限' : ''}，強度足夠。` : '有應力超過容許值或輸入資料有誤，請檢討。'}（最大應力比 ${f(C.maxU, 3)}）</p></div>`;
+  // --- 2 計算方法 ---
+  o += `<div class="sheet">${ph('2. 計算方法')}<h2>2. 伸臂強度計算方法</h2><div class="formula">
+    <p>各斷面之應力為垂直荷重、水平荷重及風荷重所生應力之合成；鋼索同步伸縮之伸臂另計軸力。</p>
+    <h4>2-1 垂直荷重所生彎曲應力</h4>
+    <div class="eq">σ₁ = M<sub>x</sub> / Z<sub>x1</sub>（拉側）…(1)　σ₁′ = M<sub>x</sub> / Z<sub>x2</sub>（壓側）…(2)</div>
+    <div class="eq">M<sub>x</sub> = {ψ₁·W·L + ψ₂(Σℓi·Gi + ½·wi·ℓ₀²)} cos θ　…(3)</div>
+    <div class="eq">W：額定荷重（含吊具）；Gi：各部重量；wi：伸臂單位長重量；θ：伸臂角<br>L、ℓi、ℓ₀：自臨界斷面至頂端滑輪銷、各部重心、本節伸臂頂端之距離。${C.eff.mode === 'est' ? '<br>（實測估算：ℓ = x − x<sub>斷面</sub>，x 為自伸臂最底端旋轉中心起算之位置）' : ''}</div>
+    ${d.axial === 'wire' ? `<h4>2-2 軸力所生應力（鋼索同步伸縮）</h4>
+    <div class="eq">N<sub>n</sub> = (ψ₁·W + ψ₂·G<sub>n</sub>)·sin θ + ψ₁·W/n …(7)　N<sub>n−1</sub> = 2N<sub>n</sub> + ψ₂·G<sub>n−1</sub>·sin θ …(6)</div>
+    <div class="eq">N<sub>n−2</sub> = 2N<sub>n−1</sub> − N<sub>n</sub> + ψ₂·G<sub>n−2</sub>·sin θ …(5)　N<sub>n−3</sub> = N<sub>n−1</sub>（拉力）…(4)</div>
+    <div class="eq">壓縮：σ₂ = −N/A，σ₂′ = ω·N/A；拉伸：σ₂ = N/A，σ₂′ = −N/A；λ = 2ℓ/k<sub>y</sub>，ω 由 λ 求得${d.omegaMode === 'table' ? '（自訂 λ–ω 表）' : d.omegaMode === 'code' ? `（規定挫屈係數表第 (${omegaCls() + 1}) 表${d.omegaRow === 'lo' ? '下欄' : '上欄'}）` : `（Λ = ${f(Lambda0(), 2)}）`}</div>` : ''}
+    <h4>2-3 水平荷重所生彎曲應力</h4>
+    <div class="eq">σ₃ = M<sub>y</sub> / Z<sub>y</sub> …(19)　M<sub>y</sub> = φ(W·L + ΣGi·ℓi + ½·wi·ℓ₀²) cos θ …(20)</div>
+    <h4>2-4 風荷重所生彎曲應力</h4>
+    <div class="eq">σ₄ = M<sub>w</sub> / Z<sub>y</sub> …(21)　M<sub>w</sub> = ΣWgi·ℓi …(22)　Wg = q·C·A …(23)</div>
+    <div class="eq">A：各節伸臂側面外露受風面積，受風中心取外露段中點。</div>
+    <h4>2-5 合成應力</h4>
+    <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄（拉側）…(24) ≤ σa = ${f(sa, 0)}　σc = σ₁′ + σ₂′ + σ₃ + σ₄（壓側）…(25) ≤ σca = ${f(sigAc(), 0)} kgf/cm²</div>
+    ${d.fatigueOn ? `<h4>疲勞檢核</h4><div class="eq">依 S-N 線圖，伸臂合成拉應力 σt 之最大值 ≤ 鋼材疲勞限 ${f(d.fatigue, 0)} kgf/cm² 時，不致疲勞破壞。</div>` : ''}
+    </div></div>`;
+  // --- 3 斷面 ---
+  const sc = drawingScale(C.geo);
+  const vhCm = sc.VH / sc.s;
+  const den = PRINT_SCALES.find(x => vhCm * 10 / x <= 120) || 50;
+  const mmPerU = (10 / den) / sc.s;
+  const sizeAttr = `width="${(sc.VW * mmPerU).toFixed(1)}mm" height="${(sc.VH * mmPerU).toFixed(1)}mm"`;
+  const shapeName = { rect: '四角形', pent: '五角形', hex: '六角形' }[S.shape];
+  o += `<div class="sheet">${ph('3. 臨界斷面')}<h2>3. 臨界斷面形狀與斷面性質</h2>
+    <p>圖 1　各節伸臂臨界斷面（${shapeName}薄殼斷面，單位 cm，比例 1 : ${den}）</p>`;
+  C.geo.forEach((g, k) => {
+    const p = S.booms[k].sec;
+    o += `<div class="sec-row">${drawSection(k, g, sc, sizeAttr, 'pk' + k)}<div>
+      <table><tbody>
+      <tr><th colspan="3">斷面 ${secName(k)}　${boomName(k)}</th></tr>
+      <tr><td>寬 B × 高 H</td><td class="n">${f(p.B, 2)} × ${f(p.H, 2)}</td><td>cm</td></tr>
+      ${S.shape === 'hex' ? `<tr><td>傾角 上 / 下</td><td class="n">${f(p.at, 1)}° / ${f(p.ab, 1)}°</td><td></td></tr>` : S.shape === 'pent' ? `<tr><td>下傾角</td><td class="n">${f(p.ab, 1)}°</td><td></td></tr>` : ''}
+      <tr><td>板厚 上 / 側 / 下</td><td class="n">${f(p.tt, 2)} / ${f(p.ts, 2)} / ${f(p.tb, 2)}</td><td>cm</td></tr>
+      <tr><td>側板內折 上 / 下</td><td class="n">${!p.fold ? '無' : `${p.dtL > 0 ? f(p.dtL, 1) + '×' + f(p.dtT, 2) : '—'} / ${p.dbL > 0 ? f(p.dbL, 1) + '×' + f(p.dbT, 2) : '—'}`}</td><td>cm</td></tr>
+      ${g.err ? `<tr><td colspan="3" class="err">${esc(g.err)}</td></tr>` : `
+      <tr><td>斷面積 A</td><td class="n">${f(g.A, 2)}</td><td>cm²</td></tr>
+      <tr><td>e₁ / e₂ / e<sub>y</sub></td><td class="n">${f(g.e1, 2)} / ${f(g.e2, 2)} / ${f(g.ey, 2)}</td><td>cm</td></tr>
+      <tr><td>I<sub>x</sub> / I<sub>y</sub></td><td class="n">${f(g.Ix, 1)} / ${f(g.Iy, 1)}</td><td>cm⁴</td></tr>
+      <tr><td>Z<sub>x1</sub> / Z<sub>x2</sub> / Z<sub>y</sub></td><td class="n">${f(g.Zx1, 1)} / ${f(g.Zx2, 1)} / ${f(g.Zy, 1)}</td><td>cm³</td></tr>
+      <tr><td>k<sub>x</sub> / k<sub>y</sub></td><td class="n">${f(g.kx, 2)} / ${f(g.ky, 2)}</td><td>cm</td></tr>`}
+      </tbody></table></div></div>`;
+  });
+  o += `<div class="blk"><h3>表 1　各斷面之斷面性質</h3>${table1HTML(C)}</div></div>`;
+  // --- 4 重量與重心 ---
+  const items = C.eff.items;
+  o += `<div class="sheet">${ph('4. 重量與重心位置')}<h2>4. 重量與重心位置</h2>
+    <h3>各部重量</h3><table><thead><tr><th>代號</th><th>名稱</th><th>重量 (kgf)</th>${C.eff.mode === 'est' ? '<th>重心位置取法</th>' : ''}</tr></thead><tbody>
+    ${items.map((it, i) => `<tr><td>G${i + 1}</td><td>${esc(it.name)}</td><td class="n">${f(it.G, 0)}</td>${C.eff.mode === 'est' ? `<td>${it.kind === 'boom' ? '外露段型心' : it.kind === 'cyl' ? `油壓缸 ${it.cyl}：(第${it.cyl}節頭端 − 外露長 + 第${it.cyl + 1}節頭端)/2` : `附掛物，全伸位置 ${f(it.X, 1)} cm`}</td>` : ''}</tr>`).join('')}
+    </tbody></table>
+    <table><thead><tr><th>伸臂</th>${S.booms.map((_, k) => `<th>${boomName(k)}</th>`).join('')}</tr></thead><tbody>
+    <tr><td>單位長重量 w (kgf/cm)</td>${C.geo.map((g, k) => `<td class="n">${f(wOf(k, g), 3)}</td>`).join('')}</tr></tbody></table>`;
+  if (C.eff.mode === 'est') {
+    const E = S.est;
+    o += `<h3>全伸時各部位置（自旋轉中心起算，cm）　伸縮油壓缸 ${E.m} 支，第 ${E.m + 1} 節以後鋼索同步伸縮</h3>
+    <table><thead><tr><th>項目</th>${S.booms.map((_, k) => `<th>${secName(k)}</th>`).join('')}<th>滑輪銷</th></tr></thead><tbody>
+    <tr><td>伸臂頭端 X</td>${E.X.map(x => `<td class="n">${f(x, 1)}</td>`).join('')}<td class="n">${f(E.Xpin, 1)}</td></tr>
+    <tr><td>斷面位置</td>${E.Xsec.map(x => `<td class="n">${f(x, 1)}</td>`).join('')}<td></td></tr></tbody></table>
+    <h3>表 2　各伸臂長度之位置與 L、ℓi（cm）</h3>${estOutHTML(C, false).replace(/class="card stage blk"/g, 'class="blk"')}`;
+  } else {
+    o += `<h3>表 2　L 與 ℓi 之值（cm）</h3>`;
+    const head = `<thead><tr><th>伸臂長</th><th>項目</th>${S.booms.map((_, k) => `<th>${secName(k)}</th>`).join('')}</tr></thead>`;
+    S.stages.forEach((st, s) => {
+      const T = C.eff.tables[s];
+      const rowsDef = [['L', t => t.L], ['ℓ₀', t => t.l0], ...items.map((it, i) => [`ℓ${i + 1}`, t => t.li[i]])];
+      o += `<div class="blk"><table>${head}<tbody>`;
+      rowsDef.forEach(([lab, fn], j) => {
+        o += `<tr>${j === 0 ? `<td rowspan="${rowsDef.length}" class="grp">${f(st.len, 2)} m</td>` : ''}<td>${lab}</td>${T.map(t => t.active ? `<td class="n">${isNum(fn(t)) ? f(fn(t), 1) : '—'}</td>` : '<td class="na"></td>').join('')}</tr>`;
+      });
+      o += `</tbody></table></div>`;
+    });
+  }
+  o += `</div>`;
+  // --- 5 結果（橫式） ---
+  const groups = pageGroups(S.stages.map(st => st.rows.length), 30);
+  let first = true;
+  TABLES.forEach(([t, sub, cell, cond]) => {
+    if (!tblOn(cond)) return;
+    groups.forEach((g, gi) => {
+      o += `<div class="sheet land">${ph('5. 應力計算結果')}${first ? `<h2 style="margin-top:0">5. 應力計算結果（單位 kgf/cm²，容許應力 ${f(sa, 0)}）</h2>` : ''}
+        ${resultTable(C, t + (gi ? '（續）' : ''), sub, cell, true, g)}</div>`;
+      first = false;
+    });
+  });
+  // --- 6 明細 ---
+  if ($('#pvDetail').checked) {
+    C.sum.forEach((m, k) => {
+      if (!m.gov) return;
+      o += `<div class="sheet">${ph('6. 計算明細')}<h2>6. 控制條件計算明細 — 斷面 ${secName(k)}（${caseTxt(m.gov)}）</h2><div class="formula">${detailHTML(C, m.gov.s, m.gov.r, k)}</div></div>`;
+    });
+  }
+  o += `<div class="sheet">${ph('附錄　吊升荷重表')}<h2>附錄　吊升荷重表</h2>${loadChartHTML()}</div>`;
+  $('#print').innerHTML = o;
+  $('#pageStyle').textContent = `@page{size:A4 portrait;margin:12mm 12mm 14mm;@bottom-center{content:"第 " counter(page) " 頁 / 共 " counter(pages) " 頁";font-size:8pt}}
+    @page land{size:A4 landscape;margin:9mm 10mm 11mm}`;
+}
+/* 列印分頁：依序將伸臂長度段分組，每組列數不超過 max（單段超過者自成一組） */
+function pageGroups(counts, max) {
+  const out = []; let cur = [], n = 0;
+  counts.forEach((c, i) => { if (cur.length && n + c > max) { out.push(cur); cur = []; n = 0; } cur.push(i); n += c; });
+  if (cur.length) out.push(cur);
+  return out;
+}
+function table1HTML(C) {
+  const R = (lab, fn) => `<tr><th style="text-align:left">${lab}</th>${C.geo.map(g => `<td class="n">${g.err ? '<span class="err">錯誤</span>' : f(fn(g), 2)}</td>`).join('')}</tr>`;
+  return `<table><thead><tr><th>斷面性質</th>${C.geo.map((_, k) => `<th>${secName(k)}</th>`).join('')}</tr></thead><tbody>
+    ${R('斷面積 A (cm²)', g => g.A)}${R('中立軸至上緣 e₁ (cm)', g => g.e1)}${R('中立軸至下緣 e₂ (cm)', g => g.e2)}${R('中立軸至側緣 e<sub>y</sub> (cm)', g => g.ey)}
+    ${R('慣性矩 I<sub>x</sub> (cm⁴)', g => g.Ix)}${R('慣性矩 I<sub>y</sub> (cm⁴)', g => g.Iy)}
+    ${R('斷面模數 Z<sub>x1</sub> (cm³)', g => g.Zx1)}${R('斷面模數 Z<sub>x2</sub> (cm³)', g => g.Zx2)}${R('斷面模數 Z<sub>y</sub> (cm³)', g => g.Zy)}
+    ${R('迴轉半徑 k<sub>x</sub> (cm)', g => g.kx)}${R('迴轉半徑 k<sub>y</sub> (cm)', g => g.ky)}
+    <tr><th style="text-align:left">單位長重量 w (kgf/cm)<br><span class="note">${isDb() ? '原廠資料' : 'A × 7.85×10⁻³'}</span></th>${C.geo.map((g, k) => `<td class="n">${isNum(wOf(k, g)) ? f(wOf(k, g), 3) : '—'}</td>`).join('')}</tr></tbody></table>`;
+}
+function openPreview() { buildPrint(); document.body.classList.add('preview'); window.scrollTo(0, 0); }
+function closePreview() { document.body.classList.remove('preview'); }
+function doPrint() { buildPrint(); setTimeout(() => window.print(), 50); }
+window.addEventListener('beforeprint', () => { if (!document.body.classList.contains('preview')) buildPrint(); });
+
+/* ---------------- 更新計算輸出 ---------------- */
+function updateComputed() {
+  if (NOCHART() && autoRowsFromStrength()) { renderChart(); renderDetailShell(); }
+  const C = compute();
+  const d = S.design;
+  $('#hdrInfo').textContent = `${S.project.title || ''}　MODEL：${S.project.model || ''}`;
+  const sa0 = $('#sA0val'); if (sa0) sa0.textContent = f(sigA0(), 0);
+  const sa = $('#sAval'); if (sa) sa.textContent = f(sigA(), 0);
+  const sac = $('#sAcval'); if (sac) sac.textContent = f(sigAc(), 0);
+  const oc = $('#omcls'); if (oc) { const i = omegaCls(); oc.textContent = `第 (${i + 1}) 表（σy = ${f(fyN(), 0)} N/mm²）${d.omegaRow === 'lo' ? '下欄（鋼管）' : '上欄'}`; }
+  const qv = $('#qval'); if (qv) qv.textContent = f(qWind(), 2);
+  const lv = $('#lamval'); if (lv) lv.textContent = f(Lambda0(), 2);
+  if (d.thetaFromR) S.stages.forEach((st, s) => st.rows.forEach((row, r) => { const e = $(`#thc-${s}-${r}`); if (e) { const t = thetaOf(st, row); e.textContent = isNum(t) ? f(t, 2) + '°' : '無解'; } }));
+  const lcp = $('#lcPreview'); if (lcp) lcp.innerHTML = loadChartHTML();
+  const sc = drawingScale(C.geo);
+  const sb = $('#sbar'); if (sb) sb.innerHTML = scaleBar(sc);
+  C.geo.forEach((g, k) => {
+    const sv = $(`#sv-${k}`); if (sv) sv.innerHTML = drawSection(k, g, sc, '', 'ar' + k);
+    const sp = $(`#sp-${k}`);
+    if (sp) sp.innerHTML = g.err ? `<p class="err">${esc(g.err)}</p> ` : `<table class="props">
+      <tr><td>斷面積 A</td><td class="n">${f(g.A, 2)}</td><td>cm²</td></tr>
+      <tr><td>e₁ / e₂ / e<sub>y</sub></td><td class="n">${f(g.e1, 2)} / ${f(g.e2, 2)} / ${f(g.ey, 2)}</td><td>cm</td></tr>
+      <tr><td>I<sub>x</sub> / I<sub>y</sub></td><td class="n">${f(g.Ix, 1)} / ${f(g.Iy, 1)}</td><td>cm⁴</td></tr>
+      <tr><td>Z<sub>x1</sub> / Z<sub>x2</sub> / Z<sub>y</sub></td><td class="n">${f(g.Zx1, 1)} / ${f(g.Zx2, 1)} / ${f(g.Zy, 1)}</td><td>cm³</td></tr>
+      <tr><td>k<sub>x</sub> / k<sub>y</sub></td><td class="n">${f(g.kx, 2)} / ${f(g.ky, 2)}</td><td>cm</td></tr></table>`;
+  });
+  const t1 = $('#t1'); if (t1) t1.innerHTML = table1HTML(C);
+  if (S.geoMode === 'est') {
+    S.est.X.forEach((x, k) => { const e = $(`#seg-${k}`); if (e) e.textContent = f(x - (k ? S.est.X[k - 1] : 0), 1); });
+    const eo = $('#estOut'); if (eo) eo.innerHTML = estOutHTML(C);
+  }
+  S.stages.forEach((_, s) => { const e = $(`#geo-${s}`); if (e) e.innerHTML = drawStage(s, C, 'as' + s); });
+  renderResults(C);
+  const de = $('#detail'); if (de) { const u = S.ui.det; de.innerHTML = detailHTML(C, u.s, u.r, u.k); }
+  if (document.body.classList.contains('preview')) buildPrint();
+  saveResult(C);
+}
+/* 申請案模式：以主控台 S1-3 荷重表（伸臂長度、荷重點）重建荷重性能表（同主控台 S3 起始資料之規則） */
+function loadChartFromHub() {
+  let c = null; try { c = JSON.parse(localStorage.getItem('hub')); } catch (e) {}
+  const num = v => { const x = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(x) ? x : NaN; };
+  if (!c) return alert('讀不到申請案資料。');
+  const ch = c.hasChart && c.origChart && (c.origChart.booms || []).length ? c.origChart : null;
+  let lens = ((c.boom && c.boom.stages_m) || []).map(num).filter(x => x > 0);
+  if (!lens.length && ch) lens = ch.booms.map(num).filter(x => x > 0);
+  if (!lens.length) return alert('S1-3 尚未建立荷重性能表或伸臂各段長度。');
+  const stages = lens.map(L => {
+    const ci = ch ? ch.booms.findIndex(b => Math.abs(num(b) - L) < 0.02) : -1, rows = [];
+    if (ci >= 0) ch.radii.forEach((r, ri) => {
+      const m = /^\s*([\d.]+)\s*(?:[（(]\s*([\d.]+)\s*m?\s*[)）])?/.exec(String((ch.cells[ri] || [])[ci] || ''));
+      if (m && num(m[1]) > 0) rows.push([num(m[1]), m[2] ? num(m[2]) : num(r), null]);
+    });
+    return { len: L, rows: rows.length ? rows : [[null, null, null]] };
+  }).reverse();   // 由全伸排到全縮
+  if (!confirm(`以 S1-3 帶入 ${stages.length} 種伸臂長度、共 ${stages.reduce((a, x) => a + x.rows.length, 0)} 個荷重點？\n目前的伸臂長度與荷重點將被取代。`)) return;
+  if (stages.length !== S.booms.length) setN(stages.length);
+  stages.forEach((st, s) => { S.stages[s].len = st.len; S.stages[s].rows = st.rows; });
+  S.design.thetaFromR = true;
+  S.ui.det = { s: 0, r: 0, k: 0 };
+}
+
+/* ---------------- STEP 1：選擇機具 ---------------- */
+function renderStep1() {
+  const card = (id) => {
+    const M = MACHINES[id], m = M.data();
+    const lens = m.stages.map(s => s.len), maxW = Math.max(...m.stages.flatMap(s => s.rows.map(r => r[0])));
+    return `<div class="card"><h3>${M.brand} ${M.model}</h3>
+      <div><span class="tag">資料庫</span><span class="tag">原廠計算書 ${esc(M.doc)}</span></div>
+      <div class="spec">伸臂 ${m.booms.length} 節，${f(Math.min(...lens), 2)} ~ ${f(Math.max(...lens), 2)} m；最大額定荷重 ${f(maxW, 0)} kgf；荷重點 ${m.stages.reduce((a, s) => a + s.rows.length, 0)} 點</div>
+      <div class="note">${esc(M.note)}</div>
+      <div class="note">帶入：外觀尺寸、各部重量、重心距離（表 2）、荷重點。斷面性質依尺寸計算。</div>
+      <button class="pri" data-act="pick" data-v="${id}">選用 ${M.model} →</button></div>`;
+  };
+  $('#step1').innerHTML = `<h2>STEP 1　選擇機具</h2>
+  <div class="pick">
+    <div class="card" style="border-color:var(--accent)"><h3>自行計算</h3>
+      <div><span class="tag">自行輸入</span></div>
+      <div class="spec">重心位置依各伸臂長度自動推算（以旋轉中心為基準點之各部位置 × 伸出比例）；斷面尺寸、重量、荷重表等其他數值由使用者填寫。</div>
+      <div class="f"><label>起始資料</label><select id="selfTpl"><option value="">空白（5 節）</option>${Object.keys(MACHINES).map(id => `<option value="${id}">以 ${MACHINES[id].model} 數據為範本</option>`).join('')}</select></div>
+      <button class="pri" data-act="self">開始自行計算 →</button></div>
+    ${Object.keys(MACHINES).map(card).join('')}
+  </div>
+  ${S.src ? `<div class="card" style="margin-top:14px"><b>目前資料：</b>${isDb() ? '資料庫 ' + esc(S.project.model) : '自行計算 ' + esc(S.project.model || '')}　<button data-act="resume">繼續目前資料 →</button> <span class="note">重新選擇將覆蓋目前輸入（可先「儲存資料檔」）。</span></div>` : ''}`;
+}
+function srcBannerHTML() {
+  return isDb()
+    ? `<div class="src-banner"><span>資料來源：<b>資料庫 ${esc(MACHINES[S.src].brand)} ${esc(S.project.model)}</b>（原廠計算書 ${esc(MACHINES[S.src].doc)}）</span><span class="note">外觀尺寸、重量、重心距離、荷重點為原廠資料並鎖定；設計條件與計算方式可調整。</span><span style="flex:1"></span><button data-act="toStep1">← 重新選擇機具</button></div>`
+    : `<div class="src-banner"><span>資料來源：<b>自行計算</b>${S.project.model ? '（' + esc(S.project.model) + '）' : ''}</span><span class="note">重心依伸臂長度推算，其他數值請自行填寫（黃底欄位）。</span><span style="flex:1"></span><button data-act="toStep1">← 重新選擇機具</button></div>`;
+}
+function renderAll() {
+  const s2 = S.step === 2 && S.src;
+  document.body.classList.toggle('s1', !s2);
+  document.body.classList.toggle('s2', !!s2);
+  document.querySelectorAll('nav a.st').forEach(a => a.classList.toggle('on', +a.dataset.step === (s2 ? 2 : 1)));
+  if (!s2) { renderStep1(); $('#hdrInfo').textContent = ''; saveResult(null); return; }
+  $('#srcBanner').innerHTML = srcBannerHTML();
+  renderDesign(); renderChart(); renderSections(); renderGeo(); renderDetailShell();
+  updateComputed();
+}
+
+/* ---------------- 事件 ---------------- */
+function readInput(el) {
+  const t = el.dataset.t;
+  if (t === 'str' || t === 'sel') return el.value;
+  if (t === 'seln') return Number(el.value);
+  if (t === 'bool') return el.checked;
+  return el.value === '' ? null : Number(el.value);
+}
+let tmr = null;
+function onEdit(el) {
+  const k = el.dataset.k;
+  setPath(k, readInput(el));
+  save();
+  if (el.dataset.struct || k === 'est.m') { if (k === 'est.m') S.est.m = Math.max(1, Math.min(S.booms.length, Math.round(S.est.m || 1))); renderAll(); return; }
+  clearTimeout(tmr);
+  tmr = setTimeout(() => {
+    if (/^stages\.\d+\.len$/.test(k)) { renderChart(); renderGeo(); renderDetailShell(); }
+    updateComputed();
+  }, 150);
+}
+document.addEventListener('input', e => { const el = e.target; if (el.dataset && el.dataset.k && el.type !== 'checkbox' && el.tagName !== 'SELECT') onEdit(el); });
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset && el.dataset.k && (el.type === 'checkbox' || el.tagName === 'SELECT')) onEdit(el);
+  if (el.dataset && /^(est\.)?items\.\d+\.name$/.test(el.dataset.k || '')) { renderGeo(); updateComputed(); }
+  if (el.id === 'dS') { S.ui.det.s = +el.value; S.ui.det.r = 0; renderDetailShell(); updateComputed(); save(); }
+  if (el.id === 'dR') { S.ui.det.r = +el.value; updateComputed(); save(); }
+  if (el.id === 'dK') { S.ui.det.k = +el.value; updateComputed(); save(); }
+  if (el.id === 'pvDetail' && document.body.classList.contains('preview')) buildPrint();
+});
+document.addEventListener('click', e => {
+  const a = e.target.closest('nav a');
+  if (a) {
+    if (a.dataset.step) { if (a.dataset.step === '2' && !S.src) return; S.step = +a.dataset.step; save(); renderAll(); window.scrollTo(0, 0); return; }
+    const el = $('#' + a.dataset.p); if (el) el.scrollIntoView({ behavior: 'smooth' }); return;
+  }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, s = +b.dataset.s, r = +b.dataset.r, i = +b.dataset.i;
+  switch (act) {
+    case 'pick': if (S.src && !confirm(`選用 ${b.dataset.v} 原廠資料？目前輸入將被覆蓋。`)) return; pickMachine(b.dataset.v); window.scrollTo(0, 0); break;
+    case 'self': if (S.src && !confirm('開始自行計算？目前輸入將被覆蓋。')) return; startSelf($('#selfTpl').value); window.scrollTo(0, 0); break;
+    case 'resume': S.step = 2; break;
+    case 'fromHub': loadChartFromHub(); break;
+    case 'toStep1': S.step = 1; window.scrollTo(0, 0); break;
+    case 'nInc': setN(S.booms.length + 1); break;
+    case 'nDec': if (S.booms.length <= 1) return; if (!confirm(`確定要刪除 ${boomName(S.booms.length - 1)}（斷面 ${secName(S.booms.length - 1)}）及最後一段伸臂長度的資料嗎？`)) return; setN(S.booms.length - 1); break;
+    case 'rowAdd': { const rs = S.stages[s].rows; rs.push(rs.length ? [...rs[rs.length - 1]] : [1000, 3, 60]); break; }
+    case 'rowDel': S.stages[s].rows.splice(r, 1); break;
+    case 'itemAdd': addItem(); break;
+    case 'itemDel': if (!confirm(`刪除 G${i + 1}「${S.items[i].name}」及其所有 ℓ 值？`)) return; delItem(i); break;
+    case 'estAdd': S.est.items.push({ name: '附掛物', G: 0, kind: 'att', boom: 0, cyl: 1, X: 0 }); break;
+    case 'estDel': if (!confirm(`刪除 G${i + 1}「${S.est.items[i].name}」？`)) return; S.est.items.splice(i, 1); break;
+    case 'shape': S.shape = b.dataset.v; break;
+    case 'omAdd': S.design.omegaTable.push([null, null]); break;
+    case 'omDel': S.design.omegaTable.splice(i, 1); break;
+    case 'omReset': S.design.omegaTable = defaultOmegaTable(); break;
+    case 'govern': { const C = compute(), g = C.sum[S.ui.det.k].gov; if (!g) return; S.ui.det.s = g.s; S.ui.det.r = g.r; break; }
+    default: return;
+  }
+  save(); renderAll();
+});
+$('#btnPrint').onclick = doPrint;
+$('#btnPreview').onclick = openPreview;
+$('#pvPrint').onclick = () => window.print();
+$('#pvClose').onclick = closePreview;
+$('#btnSave').onclick = () => {
+  const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `伸臂強度計算_${S.project.model || 'data'}.json`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#btnLoad').onclick = () => $('#fileIn').click();
+$('#fileIn').onchange = e => {
+  const file = e.target.files[0]; if (!file) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { const o = JSON.parse(rd.result); if (!o.booms || !o.stages) throw 0; S = migrate(o); save(); renderAll(); }
+    catch (err) { alert('檔案格式不正確'); }
+  };
+  rd.readAsText(file); e.target.value = '';
+};
+/* ---------------- 申請案整合（由主控台以 ?case= 開啟） ----------------
+   embed=1：主控台 S3 內嵌輸入；view=doc：申請文件檢視（直接顯示 A4 計算書）
+   boomStrength_seed  ：主控台依 S1／S2 資料寫入的起始資料（id 不同才套用一次）
+   boomStrength_result：計算判定摘要，供主控台顯示 S3 狀態 */
+const QS = new URLSearchParams(location.search);
+// 主控台重算 S4 後（final_chart 更新），無荷重性能表之荷重點隨之更新
+window.addEventListener('storage', e => { if (e.key && /:final_chart$/.test(e.key) && NOCHART()) updateComputed(); });
+const EMBED = QS.get('embed') === '1', VIEW_DOC = QS.get('view') === 'doc';
+if (EMBED) document.body.classList.add('embed');
+let resTmr = null;
+function saveResult(C) {
+  if (!window.CASE_ID) return;
+  clearTimeout(resTmr);
+  resTmr = setTimeout(() => {
+    const lim = C && S.src ? strengthLimits(C) : null;
+    const lv = JSON.stringify(lim);
+    const v = JSON.stringify(C && S.src ? { has: true, valid: !!lim, ok: !!C.ok, maxU: isFinite(C.maxU) ? +C.maxU.toFixed(3) : null, errs: C.errs.length, src: S.src, model: S.project.model || '', lens: S.stages.map(st => st.len) } : { has: false, valid: false, ok: false });
+    try {
+      if (localStorage.getItem('boomStrength_limits') !== lv) localStorage.setItem('boomStrength_limits', lv);
+      if (localStorage.getItem('boomStrength_result') !== v) localStorage.setItem('boomStrength_result', v);
+    } catch (e) {}
+  }, 300);
+}
+/* 自行計算之起始資料：伸臂長度、荷重點取自 S1 荷重性能表；位置、重量取自 S2-5（推估值） */
+function seedSelf(sd) {
+  const n = sd.stages.length;
+  S = newState(dataBlank(n), 'self', 'est', sd.model || '');
+  S.stages = sd.stages.map(st => ({ len: st.len, rows: st.rows.length ? st.rows.map(r => [r[0], r[1], null]) : [[null, null, null]], geo: [] }));
+  fillGeo(S);
+  S.design.thetaFromR = true;   // 原廠荷重表無伸臂角：由作業半徑反算
+  const E = S.est;
+  if (sd.X && sd.X.length === n) {
+    E.X = sd.X.slice(); E.Xsec = [100, ...sd.X.slice(0, -1)]; E.Xpin = sd.X[n - 1];   // 斷面 A-A 預設距旋轉中心 100 cm
+  }
+  E.m = Math.max(1, Math.min(n, sd.m || 2));
+  E.items = [
+    ...Array.from({ length: n - 1 }, (_, k) => ({ name: `伸臂(${k + 2}) 重量`, G: isNum(sd.segW && sd.segW[k + 1]) ? sd.segW[k + 1] : null, kind: 'boom', boom: k + 2, cyl: 1, X: null })),
+    ...Array.from({ length: E.m }, (_, c) => ({ name: `伸縮油壓缸 ${c + 1}`, G: isNum(sd.cylW && sd.cylW[c]) ? sd.cylW[c] : null, kind: 'cyl', boom: 0, cyl: c + 1, X: null }))
+  ];
+  if (sd.w) S.booms.forEach((b, k) => { if (isNum(sd.w[k])) b.w = sd.w[k]; });
+}
+/* 自行計算之「依 S1／S2 重新帶入」：只覆寫來自主控台的資料（伸臂長度、荷重點、油壓缸支數、重量），
+   斷面尺寸、設計條件、各部位置等使用者輸入保留 */
+function mergeSelf(sd) {
+  const n = sd.stages.length;
+  if (n !== S.booms.length) setN(n);
+  sd.stages.forEach((st, s) => { S.stages[s].len = st.len; S.stages[s].rows = st.rows.length ? st.rows.map(r => [r[0], r[1], null]) : [[null, null, null]]; });
+  S.design.thetaFromR = true;
+  const E = S.est;
+  E.m = Math.max(1, Math.min(n, sd.m || E.m || 2));
+  // 位置：已輸入者保留，空白才補推估值
+  if (sd.X && sd.X.length === n) {
+    sd.X.forEach((x, k) => { if (!isNum(E.X[k])) E.X[k] = x; });
+    if (!isNum(E.Xsec[0])) E.Xsec[0] = 100;
+    for (let k = 1; k < n; k++) if (!isNum(E.Xsec[k])) E.Xsec[k] = E.X[k - 1];
+    if (!isNum(E.Xpin)) E.Xpin = E.X[n - 1];
+  }
+  // 重量：S2-5 為原廠／實測值時覆寫；推估值只補空白
+  const putG = (it, v) => { if (isNum(v) && (sd.wManual || !isNum(it.G))) it.G = v; };
+  const others = E.items.filter(it => it.kind === 'att');
+  const booms = Array.from({ length: n - 1 }, (_, k) => E.items.find(it => it.kind === 'boom' && Number(it.boom) === k + 2) || { name: `伸臂(${k + 2}) 重量`, G: null, kind: 'boom', boom: k + 2, cyl: 1, X: null });
+  booms.forEach((it, k) => putG(it, sd.segW && sd.segW[k + 1]));
+  const cyls = Array.from({ length: E.m }, (_, c) => E.items.find(it => it.kind === 'cyl' && Number(it.cyl) === c + 1) || { name: `伸縮油壓缸 ${c + 1}`, G: null, kind: 'cyl', boom: 0, cyl: c + 1, X: null });
+  cyls.forEach((it, c) => putG(it, sd.cylW && sd.cylW[c]));
+  E.items = [...booms, ...cyls, ...others];
+  S.ui.det = { s: 0, r: 0, k: 0 };
+}
+function applySeed() {
+  if (!window.CASE_ID) return;
+  let sd = null; try { sd = JSON.parse(localStorage.getItem('boomStrength_seed')); } catch (e) {}
+  if (!sd || !sd.id || sd.id === S.seedId) return;
+  if (sd.machine && MACHINES[sd.machine]) pickMachine(sd.machine);
+  else if (sd.stages && sd.stages.length && S.src === 'self') mergeSelf(sd);
+  else if (sd.stages && sd.stages.length) seedSelf(sd);
+  else startSelf('');
+  S.seedId = sd.id;
+  if (sd.title) S.project.title = sd.title;
+  if (sd.model && !isDb()) S.project.model = sd.model;
+  save();
+}
+applySeed();
+syncSecFromHub();
+const hm = location.hash.match(/^#(URA506WY)/);   // 例：#URA506WY 直接開啟該機具（供外部系統連結）
+if (hm) pickMachine(hm[1]);
+renderAll();
+if (VIEW_DOC) {
+  document.body.classList.add('doc');
+  if (S.src) openPreview();
+  else { document.body.classList.add('preview'); $('#print').innerHTML = '<div class="doc-empty">尚未建立伸臂強度計算資料，請回主控台 <b>S3 伸臂強度計算</b> 輸入。</div>'; }
+} else if (/#print$/.test(location.hash) && S.src) openPreview();
+</script>
+</body>
+</html>
