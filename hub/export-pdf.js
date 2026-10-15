@@ -127,6 +127,52 @@ const PdfExport = (() => {
     }
   }
 
+  // <link> 樣式表 → 同位置的 <style>（保留套用順序；相對 url() 改為絕對路徑）
+  // 離屏 iframe 有時樣式表未載入（版面變成無樣式），此時重新讀取樣式檔內容補上
+  async function inlineSheets(doc, log) {
+    for (const link of Array.from(doc.querySelectorAll('link[rel~="stylesheet"]'))) {
+      let css = null, base = link.href;
+      try { const rules = link.sheet && link.sheet.cssRules; if (rules && rules.length) css = Array.from(rules).map(r => r.cssText).join('\n'); }
+      catch (e) { continue; }   // 跨網域（如 Google Fonts）保留原樣
+      if (css == null) {
+        try {
+          const r = await fetch(link.href, { cache: 'no-store' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          css = await r.text();
+          if (log) log('　（樣式表未載入，已重新讀取：' + decodeURIComponent(new URL(link.href).pathname) + '）');
+        } catch (e) { if (log) log('⚠ 樣式表無法載入：' + link.href + '（' + e.message + '）'); continue; }
+      }
+      css = css.replace(/url\((['"]?)(?!data:|blob:|https?:|#)([^'")]+)\1\)/g, (m, q, u) => { try { return `url("${new URL(u, base).href}")`; } catch (e) { return m; } });
+      const st = doc.createElement('style');
+      if (link.media && link.media !== 'all') st.media = link.media;
+      st.textContent = css;
+      link.replaceWith(st);
+    }
+  }
+
+  // 固定擷取區塊與表格寬度；表格比容器寬（如多欄荷重表）時放寬區塊與 iframe，
+  // 避免 html2canvas 複製文件時重新排版變窄、或只擷取容器寬度而切掉右側欄位
+  function fixWidth(fr, doc, el) {
+    const win = doc.defaultView;
+    el.querySelectorAll('*').forEach(n => {
+      if (n.scrollWidth > n.clientWidth + 1 && /auto|scroll|hidden/.test(win.getComputedStyle(n).overflowX)) n.style.setProperty('overflow', 'visible', 'important');
+    });
+    const left = el.getBoundingClientRect().left, cs = win.getComputedStyle(el);
+    const padR = (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+    let need = el.offsetWidth;
+    el.querySelectorAll('table').forEach(t => { need = Math.max(need, Math.ceil(t.getBoundingClientRect().left - left + t.scrollWidth + padR)); });
+    el.querySelectorAll('table').forEach(t => {
+      t.style.setProperty('width', Math.ceil(Math.max(t.scrollWidth, t.getBoundingClientRect().width)) + 'px', 'important');
+      t.style.setProperty('max-width', 'none', 'important');
+    });
+    el.style.setProperty('box-sizing', 'border-box', 'important');
+    el.style.setProperty('width', need + 'px', 'important');
+    el.style.setProperty('max-width', 'none', 'important');
+    el.style.setProperty('flex', 'none', 'important');
+    if (need + 40 > (parseFloat(fr.style.width) || 0)) fr.style.width = (need + 40) + 'px';
+    return need;
+  }
+
   class Builder {
     constructor(log) { this.log = log; this.toc = []; this.cur = null; }
     async init() {
@@ -260,6 +306,9 @@ const PdfExport = (() => {
             img.src = cv.toDataURL('image/png');
           } catch (e) { res(); }
         })));
+        // 外部樣式表同理（如 荷重表/style.css）：重新載入失敗時版面會跑掉，改為內嵌 <style>
+        await inlineSheets(doc, this.log);
+        await sleep(50);
         if (opt.prepare) await opt.prepare(win, doc);
         if (opt.print !== false) emulatePrint(doc, opt.css || '');
         else { const st = doc.createElement('style'); st.textContent = '.no-print{display:none !important;}' + (opt.css || ''); doc.head.appendChild(st); }
@@ -268,13 +317,19 @@ const PdfExport = (() => {
         const els = Array.from(doc.querySelectorAll(opt.selector)).filter(e => e.offsetHeight > 0);
         if (!els.length) throw new Error('找不到列印區塊');
         for (const el of els) {
-          const land = opt.landscapeIf ? opt.landscapeIf(el) : undefined;
           if (opt.flatten !== false) flattenForms(doc, el);
+          const elW = fixWidth(fr, doc, el);
+          const land = opt.landscapeIf ? opt.landscapeIf(el) : undefined;
           if (opt.fillA4) fillA4(el, !!land);
           drawSlashes(doc, el);
           await sleep(100);
           const brk = safeBreaks(el);
-          const cv = await win.html2canvas(el, { scale: opt.scale || 2, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: Math.max(el.scrollWidth + 40, opt.width || 1100) });
+          const cv = await win.html2canvas(el, {
+            scale: opt.scale || 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+            width: elW, height: el.offsetHeight, scrollX: 0, scrollY: 0,
+            windowWidth: Math.max(elW + 40, parseFloat(fr.style.width) || 0, opt.width || 1100),
+            windowHeight: Math.max(doc.documentElement.scrollHeight, 1600)
+          });
           const k = cv.height / (el.getBoundingClientRect().height || cv.height);
           await this.addCanvas(cv, { landscape: land, fit: !!opt.fit || !!opt.fillA4, breaks: brk.map(v => v * k) });
         }
