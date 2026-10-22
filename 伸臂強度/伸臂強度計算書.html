@@ -464,16 +464,30 @@ function effGeo() {
 
 /* ---------------- 主計算 ---------------- */
 const weld = () => (S.design.weldEff > 0 ? S.design.weldEff : 1);   // 熔接效率 η
-/* 基本容許應力 σa₀：資料庫機具採原廠值；自行計算 = σF / 1.5，σF = min(降伏應力 σy, 0.75 × 抗拉強度 σB) */
-const sigA0 = () => {
+/* 基本容許應力 σa₀（原廠機型與自行計算一律相同）：依移動式起重機安全檢查構造標準第 5 條
+   （同日本移動式クレーン構造規格第 3 條）：σa = min(降伏強度 σy ÷ 1.5, 抗拉強度 σB ÷ 1.8)；σca = σa ÷ 1.15 */
+const C_DIV = 1.15;
+const sigA0Parts = () => {
   const d = S.design;
-  if (isDb()) return d.sigA0;
-  const fy = Math.min(isNum(d.sigY) ? d.sigY : Infinity, isNum(d.sigB) ? 0.75 * d.sigB : Infinity);
-  return isFinite(fy) ? Math.round(fy / 1.5) : NaN;
+  return { y: isNum(d.sigY) ? d.sigY / 1.5 : Infinity, b: isNum(d.sigB) ? d.sigB / 1.8 : Infinity };
 };
+const sigA0 = () => {
+  const p = sigA0Parts(), v = Math.min(p.y, p.b);
+  return isFinite(v) ? Math.round(v) : NaN;
+};
+/* 容許應力計算過程（計算書與畫面共用）：每列 [項目, 算式與結果] */
+function allowRows() {
+  const d = S.design, k = d.kA, eta = weld(), p = sigA0Parts();
+  const mul = `× ${k}${eta !== 1 ? ' × ' + eta : ''}`, rows = [];
+  rows.push(['基本容許應力 σa₀', `min(σy ÷ 1.5, σB ÷ 1.8) = min(${f(d.sigY, 0)} ÷ 1.5, ${f(d.sigB, 0)} ÷ 1.8) = min(${f(p.y, 0)}, ${f(p.b, 0)}) = ${f(sigA0(), 0)} kgf/cm²`]);
+  rows.push(['容許應力增加係數 k', `${k}（含風荷重之荷重組合）`]);
+  if (eta !== 1) rows.push(['熔接效率 η', `${eta}`]);
+  rows.push([`容許拉應力 σa = σa₀ × k${eta !== 1 ? ' × η' : ''}`, `${f(sigA0(), 0)} ${mul} = ${f(sigA(), 0)} kgf/cm²`]);
+  rows.push([`容許壓應力 σca = σa₀ ÷ ${C_DIV} × k${eta !== 1 ? ' × η' : ''}`, `${f(sigA0(), 0)} ÷ ${C_DIV} ${mul} = ${f(sigAc(), 0)} kgf/cm²`]);
+  return rows;
+}
 const sigA = () => sigA0() * S.design.kA * weld();
-/* 壓應力側容許應力 σca = σa₀ / 係數 × 增加係數（現行構造規格第 3 條：σca = σa / 1.15） */
-const sigAc = () => sigA0() / (S.design.cDiv > 0 ? S.design.cDiv : 1) * S.design.kA * weld();
+const sigAc = () => sigA0() / C_DIV * S.design.kA * weld();
 const qWind = () => S.design.qk * Math.pow(Math.max(S.design.h, 16), 0.25);
 function thetaOf(st, row) {
   const d = S.design;
@@ -765,15 +779,14 @@ function renderDesign() {
   <div class="card"><h3 style="margin-top:0">伸臂材料與容許應力</h3><div class="grid">
     ${fld('抗拉強度 σB', 'design.sigB', 'kgf/cm²')}
     ${fld('降伏應力 σy', 'design.sigY', 'kgf/cm²')}
-    <div class="f"><label>基本容許應力 σa₀ ${isDb() ? '（原廠）' : '= min(σy, 0.75σB) ÷ 1.5'}</label><span class="calc" id="sA0val"></span><span class="u">kgf/cm²</span></div>
+    <div class="f"><label>基本容許應力 σa₀ = min(σy ÷ 1.5, σB ÷ 1.8)</label><span class="calc" id="sA0val"></span><span class="u">kgf/cm²</span></div>
     ${fld('容許應力增加係數（含風荷重組合）', 'design.kA', '')}
     ${fld('彈性係數 E', 'design.E', 'kgf/cm²')}
     ${fld('熔接效率 η（有非破壞檢測可取 1.0）', 'design.weldEff', '')}
     <div class="f"><label>容許拉應力 σa = σa₀ × 係數 × η</label><span class="calc" id="sAval"></span><span class="u">kgf/cm²</span></div>
-    ${fld('壓應力側容許應力除數（σca = σa₀ ÷ 此值 × 係數 × η）', 'design.cDiv', '')}
-    <div class="f"><label>容許壓應力 σca</label><span class="calc" id="sAcval"></span><span class="u">kgf/cm²</span></div>
+    <div class="f"><label>容許壓應力 σca = σa₀ ÷ 1.15 × 係數 × η</label><span class="calc" id="sAcval"></span><span class="u">kgf/cm²</span></div>
   </div>
-  <p class="note">現行移動式起重機構造規格第 3 條：σca = σa / 1.15，例：拉 300 × 1.15 = 345 N/mm²、壓 300 / 1.15 × 1.15 = 300 N/mm²（除數填 1.15）。舊式計算書拉壓同值者，除數填 1。合成應力 σt 與 σa 比較、σc 與 σca 比較。<br>自行計算（非原廠）基本容許應力 σa₀ = min(σy, 0.75σB) ÷ 1.5，由材料值自動計算；材料值依台灣法規認可：抗拉強度 6000、降伏應力 4580、彈性係數 2,100,000 kgf/cm²；熔接效率 η 預帶 0.8，焊道經非破壞檢測者可取 1.0（原廠資料取 1.0）。<br>單位換算：1 N/mm² = 10.197 kgf/cm²（例 345 N/mm² ≈ 3518 kgf/cm²）。</p></div>
+  <p class="note">移動式起重機安全檢查構造標準第 5 條（同日本移動式クレーン構造規格第 3 條）：基本容許應力 σa₀ = min(σy ÷ 1.5, σB ÷ 1.8)，σca = σa / 1.15；原廠機型與自行計算一律依此由材料值自動計算（不採原廠計算書之容許應力）。例：σa₀ 300 → 拉 300 × 1.15 = 345 N/mm²、壓 300 / 1.15 × 1.15 = 300 N/mm²。合成應力 σt 與 σa 比較、σc 與 σca 比較。<br>自行計算之材料值依台灣法規認可：抗拉強度 6000、降伏應力 4580、彈性係數 2,100,000 kgf/cm²；熔接效率 η 預帶 0.8，焊道經非破壞檢測者可取 1.0（原廠資料取 1.0）。<br>單位換算：1 N/mm² = 10.197 kgf/cm²（例 345 N/mm² ≈ 3518 kgf/cm²）。</p></div>
   <div class="card"><h3 style="margin-top:0">荷重係數</h3><div class="grid">
     ${fld('動荷重係數 ψ₁', 'design.psi1')}
     ${fld('靜荷重係數 ψ₂', 'design.psi2')}
@@ -1098,7 +1111,7 @@ function renderResults(C) {
   const sa = sigA();
   let h = `<h2>⑤ 計算結果</h2>
   <div class="verdict ${C.ok ? 'ok' : 'ng'}">${C.ok ? '✔ 各項應力均未超過容許值' : '✘ 有應力超過容許值或輸入有誤'}
-    <span style="font-weight:400;font-size:14px">容許應力 拉 σa = ${f(sigA0(), 0)} × ${S.design.kA}${weld() !== 1 ? ' × ' + weld() : ''} = <b>${f(sa, 0)}</b>${S.design.cDiv !== 1 ? `、壓 σca = <b>${f(sigAc(), 0)}</b>` : ''} kgf/cm²　最大應力比 ${f(C.maxU, 3)}　重心資料：${C.eff.mode === 'est' ? '自行計算推算' : '原廠資料'}</span></div>
+    <span style="font-weight:400;font-size:14px">容許應力 拉 σa = ${f(sigA0(), 0)} × ${S.design.kA}${weld() !== 1 ? ' × ' + weld() : ''} = <b>${f(sa, 0)}</b>、壓 σca = <b>${f(sigAc(), 0)}</b> kgf/cm²　最大應力比 ${f(C.maxU, 3)}　重心資料：${C.eff.mode === 'est' ? '自行計算推算' : '原廠資料'}</span></div>
   ${C.errs.length ? `<div class="card err">${C.errs.join('<br>')}</div>` : ''}
   <h3>各斷面最大應力</h3><div class="card"><div class="tbl">${summaryTable(C)}</div><p class="note">應力單位 kgf/cm²。應力比 = max(σt / σa, σc / σca)。</p></div>
   ${C.fat ? `<div class="card"><div class="tbl">${extraSummary(C)}</div></div>` : ''}`;
@@ -1185,20 +1198,22 @@ function buildPrint() {
   const maxW = Math.max(...S.stages.flatMap(st => st.rows.map(r => r[0])).filter(isNum));
   o += `<div class="sheet">${ph('1. 計算標準與結果')}
     <h2>1. 計算標準與結果（Strength Calculation Standards and Results）</h2>
-    <p>本計算書依移動式起重機構造規格及 JIS B 8821 起重機鋼構造部分計算基準，驗算各節伸臂臨界斷面之應力不超過容許應力。</p>
+    <p>本計算書依移動式起重機安全檢查構造標準及 JIS B 8821 起重機鋼構造部分計算基準，驗算各節伸臂臨界斷面之應力不超過容許應力。</p>
     <div class="kv"><span>最大額定荷重</span><span>${f(maxW, 0)} kgf</span><span>動荷重係數 ψ₁</span><span>${d.psi1}</span><span>靜荷重係數 ψ₂</span><span>${d.psi2}</span>
     <span>水平荷重係數 φ</span><span>${d.phi}</span><span>風力係數 C</span><span>${d.C}</span><span>速度壓 q</span><span>${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(qWind(), 2)} kgf/m²</span>
     <span>吊索掛數 n</span><span>${d.nRope}</span><span>軸力</span><span>${d.axial === 'wire' ? '鋼索同步伸縮（式 4~7）' : '不計'}</span>
     <span>重心位置資料</span><span>${C.eff.mode === 'est' ? '自行計算（依伸臂長度推算，以旋轉中心為基準點）' : `原廠計算書（${esc(S.project.model)}）`}</span></div>
     <h3>伸臂材料</h3>
     <div class="kv"><span>抗拉強度 σB</span><span>${f(d.sigB, 0)} kgf/cm² 以上</span><span>降伏應力 σy</span><span>${f(d.sigY, 0)} kgf/cm² 以上</span>
-    <span>彈性係數 E</span><span>${f(d.E, 0)} kgf/cm²</span>${weld() !== 1 ? `<span>熔接效率 η</span><span>${weld()}</span>` : ''}${isDb() ? '' : `<span>基本容許應力 σa₀</span><span>min(${f(d.sigY, 0)}, 0.75 × ${f(d.sigB, 0)}) ÷ 1.5 = ${f(sigA0(), 0)} kgf/cm²</span>`}<span>容許拉應力 σa</span><span>${f(sigA0(), 0)} × ${d.kA}${weld() !== 1 ? ' × ' + weld() : ''} = ${f(sa, 0)} kgf/cm²</span>
-    ${d.cDiv !== 1 ? `<span>容許壓應力 σca</span><span>${f(sigA0(), 0)} / ${d.cDiv} × ${d.kA}${weld() !== 1 ? ' × ' + weld() : ''} = ${f(sigAc(), 0)} kgf/cm²</span>` : ''}
+    <span>彈性係數 E</span><span>${f(d.E, 0)} kgf/cm²</span>
     ${d.fatigueOn ? `<span>疲勞限</span><span>${f(d.fatigue, 0)} kgf/cm²</span>` : ''}
 </div>
+    <h3>容許應力</h3>
+    <div class="kv">${allowRows().map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div>
+    <p class="note">依移動式起重機安全檢查構造標準第 5 條：基本容許應力取降伏強度 ÷ 1.5 與抗拉強度 ÷ 1.8 之較小值；容許壓應力 = 容許拉應力 ÷ 1.15。應力比 = max(σt ÷ σa, σc ÷ σca)${d.fatigueOn ? '、σt ÷ 疲勞限' : ''}，≦ 1 為合格。</p>
     <h3>各斷面最大應力（單位 kgf/cm²）</h3>${summaryTable(C, true)}
     ${extraSummary(C, true)}
-    <p style="font-weight:700">結論：${C.ok ? `各節伸臂臨界斷面之合成應力均未超過容許應力${d.cDiv !== 1 ? `（拉 ${f(sa, 0)}、壓 ${f(sigAc(), 0)} kgf/cm²）` : ` ${f(sa, 0)} kgf/cm²`}${C.fat ? '，最大應力未超過疲勞限' : ''}，強度足夠。` : '有應力超過容許值或輸入資料有誤，請檢討。'}（最大應力比 ${f(C.maxU, 3)}）</p></div>`;
+    <p style="font-weight:700">結論：${C.ok ? `各節伸臂臨界斷面之合成應力均未超過容許應力（拉 ${f(sa, 0)}、壓 ${f(sigAc(), 0)} kgf/cm²）${C.fat ? '，最大應力未超過疲勞限' : ''}，強度足夠。` : '有應力超過容許值或輸入資料有誤，請檢討。'}（最大應力比 ${f(C.maxU, 3)}）</p></div>`;
   // --- 2 計算方法 ---
   o += `<div class="sheet">${ph('2. 計算方法')}<h2>2. 伸臂強度計算方法</h2><div class="formula">
     <p>各斷面之應力為垂直荷重、水平荷重及風荷重所生應力之合成；鋼索同步伸縮之伸臂另計軸力。</p>
@@ -1209,15 +1224,16 @@ function buildPrint() {
     ${d.axial === 'wire' ? `<h4>2-2 軸力所生應力（鋼索同步伸縮）</h4>
     <div class="eq">N<sub>n</sub> = (ψ₁·W + ψ₂·G<sub>n</sub>)·sin θ + ψ₁·W/n …(7)　N<sub>n−1</sub> = 2N<sub>n</sub> + ψ₂·G<sub>n−1</sub>·sin θ …(6)</div>
     <div class="eq">N<sub>n−2</sub> = 2N<sub>n−1</sub> − N<sub>n</sub> + ψ₂·G<sub>n−2</sub>·sin θ …(5)　N<sub>n−3</sub> = N<sub>n−1</sub>（拉力）…(4)</div>
-    <div class="eq">壓縮：σ₂ = −N/A，σ₂′ = ω·N/A；拉伸：σ₂ = N/A，σ₂′ = −N/A；λ = 2ℓ/k<sub>y</sub>，ω 由 λ 求得${d.omegaMode === 'table' ? '（自訂 λ–ω 表）' : d.omegaMode === 'code' ? `（規定挫屈係數表第 (${omegaCls() + 1}) 表${d.omegaRow === 'lo' ? '下欄' : '上欄'}）` : `（Λ = ${f(Lambda0(), 2)}）`}</div>` : ''}
+    <div class="eq">壓縮：σ₂ = −N/A，σ₂′ = ω·N/A；拉伸：σ₂ = N/A，σ₂′ = −N/A；λ = 2ℓ/k<sub>y</sub>，ω 由 λ 求得${d.omegaMode === 'table' ? '（自訂 λ–ω 表）' : d.omegaMode === 'code' ? '（查規定挫屈係數表，依降伏強度分級）' : '（依限界細長比 Λ 之公式計算）'}</div>` : ''}
     <h4>2-3 水平荷重所生彎曲應力</h4>
     <div class="eq">σ₃ = M<sub>y</sub> / Z<sub>y</sub> …(19)　M<sub>y</sub> = φ(W·L + ΣGi·ℓi + ½·wi·ℓ₀²) cos θ …(20)</div>
     <h4>2-4 風荷重所生彎曲應力</h4>
     <div class="eq">σ₄ = M<sub>w</sub> / Z<sub>y</sub> …(21)　M<sub>w</sub> = ΣWgi·ℓi …(22)　Wg = q·C·A …(23)</div>
     <div class="eq">A：各節伸臂側面外露受風面積，受風中心取外露段中點。</div>
     <h4>2-5 合成應力</h4>
-    <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄（拉側）…(24) ≤ σa = ${f(sa, 0)}　σc = σ₁′ + σ₂′ + σ₃ + σ₄（壓側）…(25) ≤ σca = ${f(sigAc(), 0)} kgf/cm²</div>
-    ${d.fatigueOn ? `<h4>疲勞檢核</h4><div class="eq">依 S-N 線圖，伸臂合成拉應力 σt 之最大值 ≤ 鋼材疲勞限 ${f(d.fatigue, 0)} kgf/cm² 時，不致疲勞破壞。</div>` : ''}
+    <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄（拉側）…(24) ≤ σa　σc = σ₁′ + σ₂′ + σ₃ + σ₄（壓側）…(25) ≤ σca</div>
+    <div class="eq">σa：容許拉應力；σca：容許壓應力（數值及計算過程見「1. 計算標準與結果」）。應力比 = max(σt ÷ σa, σc ÷ σca)，≦ 1 為合格。</div>
+    ${d.fatigueOn ? `<h4>疲勞檢核</h4><div class="eq">依 S-N 線圖，伸臂合成拉應力 σt 之最大值不超過鋼材疲勞限時，不致疲勞破壞。</div>` : ''}
     </div></div>`;
   // --- 3 斷面 ---
   const sc = drawingScale(C.geo);

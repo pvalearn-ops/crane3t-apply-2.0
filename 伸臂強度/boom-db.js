@@ -18,11 +18,11 @@
     return {
       project: { title: '油壓起重機', model: 'URA506WY', no: '' },
       design: {
-        sigB: 6000, sigY: 4600, sigA0: 2700, kA: 1.15, E: 2100000,
+        sigB: 6000, sigY: 4600, kA: 1.15, E: 2100000,
         psi1: 1.25, psi2: 1.1, phi: 0.05, C: 1.2, qk: 8.5, h: 16, headA: 0,
         axial: 'wire', nRope: 4,
         omegaMode: 'formula', omegaTable: null, omegaCls: 0, omegaRow: 'up',
-        cDiv: 1, fatigueOn: false, fatigue: 3600, weldEff: 1,
+        fatigueOn: false, fatigue: 3600, weldEff: 1,
         round: 'ceil', thetaFromR: false, rOff: 0
       },
       shape: 'hex',
@@ -98,11 +98,11 @@
 
   /* 自行計算預設設計條件（現行構造規格：σca 另計、ω 查表）；材料值另以 SELF_DESIGN 覆寫 */
   const BASE_DESIGN = {
-    sigB: kgf(590), sigY: kgf(450), sigA0: kgf(300), kA: 1.15, E: kgf(206000), weldEff: 1,
+    sigB: kgf(590), sigY: kgf(450), kA: 1.15, E: kgf(206000), weldEff: 1,
     psi1: 1.25, psi2: 1.1, phi: 0.05, C: 1.2, qk: 8.5, h: 16, headA: 0,
     axial: 'wire', nRope: 4,
     omegaMode: 'code', omegaTable: null, omegaCls: 0, omegaRow: 'up',
-    cDiv: 1.15, fatigueOn: false, fatigue: 3600,
+    fatigueOn: false, fatigue: 3600,
     round: 'dec1', thetaFromR: false, rOff: 0
   };
 

@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261022b';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261022d';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
