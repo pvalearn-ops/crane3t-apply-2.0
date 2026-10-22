@@ -283,6 +283,16 @@ function startSelf(tpl) {
   S = newState(m, 'self', 'est', MACHINES[tpl] ? m.project.model + '（自行計算）' : '');
   Object.assign(S.design, SELF_DESIGN);
 }
+/* 斷面位置預設值：A-A 距旋轉中心 100 cm；第 k 節斷面位於前一節頭端內側，扣除擋板：
+   x斷面(k) = X(k−1) − (n − k) × 擋板 10 cm（例 5 節、X = 250/500/750/1000/1250 → 100/210/470/730/990） */
+const STOP_PLATE = 10;
+function xsecDefault(X, k, n) { return k ? X[k - 1] - (n - k) * STOP_PLATE : 100; }
+/* 舊版預設值（x斷面 = 前一節頭端，未扣擋板）改為新預設值；使用者自行輸入之其他值保留 */
+function fixOldXsec(E) {
+  if (!E || !Array.isArray(E.X) || !Array.isArray(E.Xsec)) return;
+  const n = E.Xsec.length;
+  for (let k = 1; k < n; k++) if (Number.isFinite(E.X[k - 1]) && E.Xsec[k] === E.X[k - 1]) E.Xsec[k] = xsecDefault(E.X, k, n);
+}
 function migrate(o) {
   const b = baseState();
   const S2 = Object.assign(b, o);
@@ -295,7 +305,7 @@ function migrate(o) {
   if (MACHINES[S2.src]) {   // 資料庫機具：鎖定欄位一律以資料庫為準
     const m = MACHINES[S2.src].data();
     LOCK_KEYS.forEach(k => S2[k] = m[k]); S2.est = m.est; S2.geoMode = 'oem'; S2.project.model = m.project.model;
-  } else if (S2.src === 'self') { S2.geoMode = 'est'; if (S2.est && Array.isArray(S2.est.Xsec) && !(S2.est.Xsec[0] > 0)) S2.est.Xsec[0] = 100; }   // 此處 isNum 尚未定義，勿使用
+  } else if (S2.src === 'self') { S2.geoMode = 'est'; if (S2.est && Array.isArray(S2.est.Xsec) && !(S2.est.Xsec[0] > 0)) S2.est.Xsec[0] = 100; fixOldXsec(S2.est); }   // 此處 isNum 尚未定義，勿使用
   S2.booms.forEach(bm => { if (bm.sec.fold === undefined) bm.sec.fold = bm.sec.dtL > 0 || bm.sec.dbL > 0; });
   fillGeo(S2);
   S2.ui = { det: (o.ui && o.ui.det) || { s: 0, r: 0, k: 0 } };
@@ -683,7 +693,7 @@ function setN(n) {
     const minLen = S.stages.length ? Math.min(...S.stages.map(s => s.len)) : 5;
     S.stages.push({ len: +(Math.max(minLen - 2, 1)).toFixed(2), rows: [[1000, 3, 60]], geo: S.booms.map(() => blankGeo()) });
     const E = S.est, lx = E.X.length ? E.X[E.X.length - 1] : 0;
-    E.Xsec.push(lx); E.X.push(lx + 240); E.Xpin += 240;
+    E.Xsec.push(lx - STOP_PLATE); E.X.push(lx + 240); E.Xpin += 240;
     E.items.push({ name: `${boomName(k)} 重量`, G: 0, kind: 'boom', boom: k + 1, cyl: 1, X: null });
   }
   while (S.booms.length > n) {
@@ -982,7 +992,7 @@ function geoEstInputs() {
   <tr><th style="text-align:left">斷面位置 x<sub>斷面</sub></th>${S.booms.map((_, k) => `<td>${ni(`est.Xsec.${k}`)}</td>`).join('')}</tr>
   </table></div>
   <div class="grid" style="margin-top:8px">${fld('頂端滑輪銷位置 X<sub>pin</sub>（全伸）', 'est.Xpin', 'cm')}</div>
-  <p class="note">斷面 ${secName(0)} 固定於第 1 節；斷面 ${secName(1)} 起位於前一節伸臂頭端附近，隨前一節一起移動。滑輪銷隨最末節移動。各段之位置 = 全伸位置 − 該節縮回量。</p></div>
+  <p class="note">斷面 ${secName(0)} 固定於第 1 節；斷面 ${secName(1)} 起位於前一節伸臂頭端內側，隨前一節一起移動；預設 x<sub>斷面</sub> = X<sub>k−1</sub> − 擋板數 × ${STOP_PLATE} cm（第 k 節之擋板數 = 總節數 − k + 1，例 5 節之 ${secName(1)} 扣 4 片）。滑輪銷隨最末節移動。各段之位置 = 全伸位置 − 該節縮回量。</p></div>
   <div class="card"><h3 style="margin-top:0">集中重量 Gi 與重心位置取法</h3><div class="tbl"><table>
   <tr><th>代號</th><th>名稱</th><th>重量 (kgf)</th><th>種類</th><th>對應</th><th>全伸時位置 x（附掛物）</th><th></th></tr>`;
   E.items.forEach((it, i) => {
@@ -1523,7 +1533,7 @@ function seedSelf(sd) {
   S.design.thetaFromR = true;   // 原廠荷重表無伸臂角：由作業半徑反算
   const E = S.est;
   if (sd.X && sd.X.length === n) {
-    E.X = sd.X.slice(); E.Xsec = [100, ...sd.X.slice(0, -1)]; E.Xpin = sd.X[n - 1];   // 斷面 A-A 預設距旋轉中心 100 cm
+    E.X = sd.X.slice(); E.Xsec = sd.X.map((_, k) => xsecDefault(sd.X, k, n)); E.Xpin = sd.X[n - 1];
   }
   E.m = Math.max(1, Math.min(n, sd.m || 2));
   E.items = [
@@ -1544,8 +1554,8 @@ function mergeSelf(sd) {
   // 位置：已輸入者保留，空白才補推估值
   if (sd.X && sd.X.length === n) {
     sd.X.forEach((x, k) => { if (!isNum(E.X[k])) E.X[k] = x; });
-    if (!isNum(E.Xsec[0])) E.Xsec[0] = 100;
-    for (let k = 1; k < n; k++) if (!isNum(E.Xsec[k])) E.Xsec[k] = E.X[k - 1];
+    fixOldXsec(E);
+    for (let k = 0; k < n; k++) if (!isNum(E.Xsec[k])) E.Xsec[k] = xsecDefault(E.X, k, n);
     if (!isNum(E.Xpin)) E.Xpin = E.X[n - 1];
   }
   // 重量：S2-5 為原廠／實測值時覆寫；推估值只補空白

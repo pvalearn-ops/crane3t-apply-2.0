@@ -42,24 +42,38 @@ const Calc = (() => {
   }
 
   /* ---------- 伸臂重量推估（無原廠資料時） ----------
+   * 有各節斷面（unitW：單位長重量 kg/cm = A × 7.85×10⁻³）：
+   *   第 i 節重量 = (L_i − L_{i−1}) × w_i × 1.2（1.2 計入內折、滑塊、端板等附屬件）
+   * 無斷面時採經驗式：
    *   Wr ≈ 23 × √(原吊升荷重 t) × 全伸長度 m（例：2.95t、12.5m → 約 494 kg）
-   * 各節重量 ∝ 節長 × 0.85^(節次)，油壓缸約佔 8%。 */
-  function estimateBoom(stagesCm, origCapT, numCyl) {
-    const n = stagesCm.length; if (!n) return { segW: [], cylW: [], Wr: 0 };
-    const Lmax = stagesCm[n - 1] / 100;
-    const cap = isFinite(origCapT) && origCapT > 0 ? origCapT : 2.9;
-    const Wr = 23 * Math.sqrt(cap) * Lmax;
+   *   各節重量 ∝ 節長 × 0.85^(節次)
+   * 油壓缸均約佔 8%。 */
+  const SEG_FACTOR = 1.2;
+  function estimateBoom(stagesCm, origCapT, numCyl, unitW) {
+    const n = stagesCm.length; if (!n) return { segW: [], cylW: [], Wr: 0, bySec: false };
     const nc = Math.max(0, Math.min(isFinite(numCyl) ? numCyl : Math.floor(n / 2), n));
     const calcLen = stagesCm.map((v, i) => i === 0 ? v : v - stagesCm[i - 1]);
-    const raw = calcLen.map((l, i) => Math.max(l, 1) * Math.pow(0.85, i));
-    const rs = raw.reduce((a, b) => a + b, 0);
     const segShare = nc ? 0.92 : 1;
-    const segW = raw.map(r => Math.round(Wr * segShare * r / rs));
+    const bySec = !!(unitW && unitW.length >= n && unitW.slice(0, n).every(w => isFinite(w) && w > 0));
+    let segW, Wr;
+    if (bySec) {
+      segW = calcLen.map((l, i) => Math.round(Math.max(l, 0) * unitW[i] * SEG_FACTOR));
+      Wr = segW.reduce((a, b) => a + b, 0) / segShare;
+    } else {
+      const Lmax = stagesCm[n - 1] / 100;
+      const cap = isFinite(origCapT) && origCapT > 0 ? origCapT : 2.9;
+      Wr = 23 * Math.sqrt(cap) * Lmax;
+      const raw = calcLen.map((l, i) => Math.max(l, 1) * Math.pow(0.85, i));
+      const rs = raw.reduce((a, b) => a + b, 0);
+      segW = raw.map(r => Math.round(Wr * segShare * r / rs));
+    }
     const cw = Array.from({ length: nc }, (_, i) => 1 - 0.2 * i).map(x => Math.max(x, 0.3));
     const cs = cw.reduce((a, b) => a + b, 0) || 1;
     const cylW = cw.map(x => Math.round(Wr * (1 - segShare) * x / cs));
-    return { segW, cylW, Wr: segW.reduce((a, b) => a + b, 0) + cylW.reduce((a, b) => a + b, 0), numCyl: nc };
+    return { segW, cylW, Wr: segW.reduce((a, b) => a + b, 0) + cylW.reduce((a, b) => a + b, 0), numCyl: nc, bySec };
   }
+  /* 各節斷面單位長重量（kg/cm）來源：由主控台注入（S1-3／S3 斷面 × 鋼材比重） */
+  let unitWOf = () => null;
 
   /* ---------- 單點安定度上限 ---------- */
   function stabLimit(P, B, Lcm, rcm) {
@@ -175,8 +189,8 @@ const Calc = (() => {
       return { segW, cylW, est: false };
     }
     const capUsed = origCapacityKg(c) / 1000;
-    const e = estimateBoom(lengths, capUsed, nc);
-    return { segW: e.segW, cylW: e.cylW, est: true, numCyl: e.numCyl, capUsed };
+    const e = estimateBoom(lengths, capUsed, nc, unitWOf(c));
+    return { segW: e.segW, cylW: e.cylW, est: true, numCyl: e.numCyl, capUsed, bySec: e.bySec };
   }
 
   /* ---------- 伸臂強度上限：取半徑前後兩個取樣點之較小值（保守） ---------- */
@@ -328,10 +342,10 @@ const Calc = (() => {
 
     return {
       ok: true, warn, liftT, maxVal, booms, radii, cells, scale, fitInfo, minSF, defaultsUsed: P._used, unstableCount, deadStab, deadStr,
-      boom: { lengths, segW: bw.segW.map(w => Math.round(w * scale)), cylW: bw.cylW.map(w => Math.round(w * scale)), Wr: Math.round(B.Wr), est: bw.est },
+      boom: { lengths, segW: bw.segW.map(w => Math.round(w * scale)), cylW: bw.cylW.map(w => Math.round(w * scale)), Wr: Math.round(B.Wr), est: bw.est, bySec: !!bw.bySec },
       params: Object.assign({}, P, { Ws: Math.round(PP.Ws) }), checks, computedAt: new Date().toISOString()
     };
   }
 
-  return { compute, setStrength: (fn) => { strengthOf = fn; }, defaults, effective, origCapacityKg, STAB_LABEL, estimateBoom, boomEngine, parseCell, num };
+  return { compute, setStrength: (fn) => { strengthOf = fn; }, setUnitW: (fn) => { unitWOf = fn; }, defaults, effective, origCapacityKg, STAB_LABEL, estimateBoom, boomEngine, parseCell, num };
 })();

@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261011k';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261022b';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -634,6 +634,23 @@ function renderSecPreview(pane) {
       <tr><td>k<sub>x</sub> / k<sub>y</sub></td><td>${fx(g.kx, 2)} / ${fx(g.ky, 2)}</td><td>cm</td></tr></table>`;
   });
 }
+/* 各節伸臂單位長重量 w（kg/cm）= 斷面積 A × 7.85×10⁻³（同伸臂強度計算書）
+   斷面來源：無荷重表取 S1-3 斷面；有荷重表取 S3 自行輸入之斷面。任一節缺斷面即回傳 null（改用經驗式） */
+function secUnitW(c) {
+  if (!window.BoomGeo) return null;
+  const n = (c.boom.stages_m || []).map(N).filter(x => x > 0).length;
+  let shape, secs;
+  const st = Store.subGet(c.id, 'boomStrengthCalc.v1');
+  if (c.hasChart === false && c.boomSec && c.boomSec.secs.some(x => x && N(x.B) > 0)) { shape = c.boomSec.shape; secs = c.boomSec.secs; }
+  else if (st && st.src === 'self' && (st.booms || []).some(b => b.sec && N(b.sec.B) > 0)) { shape = st.shape; secs = st.booms.map(b => b.sec || {}); }
+  else return null;
+  if (!n || secs.length < n) return null;
+  const num = (v) => { const x = parseFloat(v); return isFinite(x) ? x : null; };
+  const w = secs.slice(0, n).map(x => { const q = {}; ['B', 'H', 'tt', 'ts', 'tb', 'at', 'ab', 'dtL', 'dtT', 'dbL', 'dbT'].forEach(k => q[k] = num(x[k])); q.fold = !!x.fold;
+    const g = BoomGeo.secGeom(shape || 'hex', q); return g && !g.err && g.A > 0 ? g.A * 7.85e-3 : NaN; });
+  return w.every(x => x > 0) ? w : null;
+}
+Calc.setUnitW(secUnitW);
 let secPrevT = null;
 function bindS13(pane, rerender) {
   $$('input[data-sec]', pane).forEach(el => {
@@ -1098,7 +1115,8 @@ function pStep2(pane) {
   const stages = cur.boom.stages_m.length ? cur.boom.stages_m : ['', ''];
   if (!cur.boom.stages_m.length) cur.boom.stages_m = stages;
   const manual = cur.boom.weightMode === 'manual';
-  const est = Calc.estimateBoom(stages.map(N).filter(x => x > 0).map(x => x * 100), N(cur.crane.orig_capacity_t), N(cur.boom.numCyl));
+  const unitW = secUnitW(cur);
+  const est = Calc.estimateBoom(stages.map(N).filter(x => x > 0).map(x => x * 100), N(cur.crane.orig_capacity_t), N(cur.boom.numCyl), unitW);
   pane.innerHTML = (miss2.length ? `<div class="callout warn" id="s2Miss"><b>S2 尚缺：</b>${esc(miss2.join('、'))}</div>` : '<div class="callout ok" id="s2Miss">S2 必填資料已完成。</div>') + basicCardsHtml() + `
   <div class="card">
     <h2>S2-4　搭乘設備</h2>
@@ -1113,13 +1131,15 @@ function pStep2(pane) {
     <h2>S2-5　伸臂與油壓缸重量</h2>
     <p class="hint">伸臂各段長度依 S1-3（${stages.map(N).filter(x => x > 0).join('、') || '尚未設定'} m）；原吊升荷重、油壓缸支數請於 S1-3 填寫。</p>
     <div class="fgrid">
-      ${F('boom.weightMode', '伸臂重量來源', { type: 'select', options: [['auto', cur.hasChart ? '自動推估＋依荷重表反算' : '自動推估（經驗公式）'], ['manual', '手動輸入（有原廠資料／實測）']] })}
+      ${F('boom.weightMode', '伸臂重量來源', { type: 'select', options: [['auto', est.bySec ? '自動推估（依斷面單位重量）' : cur.hasChart ? '自動推估＋依荷重表反算' : '自動推估（經驗公式）'], ['manual', '手動輸入（有原廠資料／實測）']] })}
     </div>
     <div id="bwBox" style="margin-top:10px">${manual ? `
       <table class="check-table"><tr><th>項目</th>${stages.map((_, i) => `<th>第${i + 1}節</th>`).join('')}</tr>
       <tr><td>伸臂重量 kg</td>${stages.map((_, i) => `<td><input data-sw="${i}" value="${esc((cur.boom.segW || [])[i] || '')}" style="width:70px"></td>`).join('')}</tr>
       <tr><td>油壓缸重量 kg</td>${stages.map((_, i) => `<td><input data-cw="${i}" value="${esc((cur.boom.cylW || [])[i] || '')}" style="width:70px"></td>`).join('')}</tr></table>`
-      : `<div class="callout info">推估伸臂各節重量（kg）：${est.segW.join('、') || '—'}；油壓缸：${est.cylW.join('、') || '—'}；合計約 <b>${Math.round(est.Wr)} kg</b>。<br><small>經驗式：Wr ≈ 23 × √(原吊升荷重 t) × 全伸長度 m，油壓缸約佔 8%（例：2.95t、12.5m 約 494 kg）。有原廠或實測重量時請改選「手動輸入」。${cur.hasChart && !N(cur.crane.orig_capacity_t) ? '未填原吊升荷重時，計算將以荷重表最大值反推。' : ''}</small></div>`}
+      : `<div class="callout info">推估伸臂各節重量（kg）：${est.segW.join('、') || '—'}；油壓缸：${est.cylW.join('、') || '—'}；合計約 <b>${Math.round(est.Wr)} kg</b>。<br><small>${est.bySec
+        ? `依斷面單位重量：第 i 節重量 = (L<sub>i</sub> − L<sub>i−1</sub>) × w<sub>i</sub> × 1.2，w = 斷面積 A × 7.85×10⁻³ kg/cm（各節 w：${unitW.map(w => (w * 100).toFixed(2)).join('、')} kg/m）；油壓缸約佔 8%。斷面取自 ${cur.hasChart === false ? 'S1-3' : 'S3 伸臂強度計算書'}。`
+        : `經驗式：Wr ≈ 23 × √(原吊升荷重 t) × 全伸長度 m，油壓缸約佔 8%（例：2.95t、12.5m 約 494 kg）。${cur.hasChart === false ? '於 S1-3 填妥各節伸臂斷面後，改依斷面單位重量 × 節長 × 1.2 推估。' : '於 S3 自行輸入各節斷面後，改依斷面單位重量 × 節長 × 1.2 推估。'}`}有原廠或實測重量時請改選「手動輸入」。${!est.bySec && cur.hasChart && !N(cur.crane.orig_capacity_t) ? '未填原吊升荷重時，計算將以荷重表最大值反推。' : ''}</small></div>`}
     </div>
   </div>
   <div class="card">
@@ -1160,7 +1180,7 @@ function pStep2(pane) {
 }
 function seedManual() {
   const st = cur.boom.stages_m.map(N).filter(x => x > 0).map(x => x * 100);
-  const e = Calc.estimateBoom(st, N(cur.crane.orig_capacity_t), N(cur.boom.numCyl));
+  const e = Calc.estimateBoom(st, N(cur.crane.orig_capacity_t), N(cur.boom.numCyl), secUnitW(cur));
   if (!(cur.boom.segW || []).some(x => N(x) > 0)) cur.boom.segW = e.segW.map(String);
   if (!(cur.boom.cylW || []).some(x => N(x) > 0)) cur.boom.cylW = e.cylW.map(String);
 }
@@ -1190,7 +1210,7 @@ function boomSeed(c) {
   sd.m = N(c.boom.numCyl) > 0 ? Math.round(N(c.boom.numCyl)) : Math.max(1, Math.floor(lens.length / 2));
   const est = c.boom.weightMode === 'manual' && (c.boom.segW || []).some(x => N(x) > 0)
     ? { segW: c.boom.segW.map(N), cylW: (c.boom.cylW || []).map(N) }
-    : Calc.estimateBoom(lens.map(x => x * 100), N(c.crane.orig_capacity_t), N(c.boom.numCyl));
+    : Calc.estimateBoom(lens.map(x => x * 100), N(c.crane.orig_capacity_t), N(c.boom.numCyl), secUnitW(c));
   sd.segW = est.segW; sd.cylW = est.cylW;
   sd.wManual = c.boom.weightMode === 'manual';   // S2-5 為原廠／實測重量（可覆寫）；推估值只補空白
   sd.w = lens.map((L, k) => { const seg = (L - (k ? lens[k - 1] : 0)) * 100; return est.segW[k] > 0 && seg > 0 ? Math.round(est.segW[k] / seg * 1000) / 1000 : null; });
@@ -1270,7 +1290,7 @@ function pStep4(pane) {
     </div>
     <div class="kpis">
       <div class="kpi ok"><div class="lbl">申請吊升荷重</div><div class="val">${r.liftT.toFixed(2)} 公噸</div><div class="sub">新荷重表最大值 ${r.maxVal} kg</div></div>
-      <div class="kpi"><div class="lbl">伸臂重量 Wr（${r.boom.est ? '推估，依原吊升荷重 ' + (r.fitInfo && r.fitInfo.origCapUsed ? r.fitInfo.origCapUsed.toFixed(2) : N(cur.crane.orig_capacity_t) || '—') + ' t' : '輸入值'}）</div><div class="val">${r.boom.Wr} kg</div><div class="sub">各節 ${r.boom.segW.join('/')}；油壓缸 ${r.boom.cylW.join('/') || '—'}</div></div>
+      <div class="kpi"><div class="lbl">伸臂重量 Wr（${r.boom.bySec ? '推估，依斷面單位重量 × 節長 × 1.2' : r.boom.est ? '推估，依原吊升荷重 ' + (r.fitInfo && r.fitInfo.origCapUsed ? r.fitInfo.origCapUsed.toFixed(2) : N(cur.crane.orig_capacity_t) || '—') + ' t' : '輸入值'}）</div><div class="val">${r.boom.Wr} kg</div><div class="sub">各節 ${r.boom.segW.join('/')}；油壓缸 ${r.boom.cylW.join('/') || '—'}</div></div>
       <div class="kpi ${r.minSF >= 1.15 - 1e-6 ? 'ok' : 'ng'}"><div class="lbl">前方安定度最小值 SF</div><div class="val">${isFinite(r.minSF) ? r.minSF.toFixed(3) : '無翻倒之虞'}</div><div class="sub">規定 ≧ 1.15</div></div>
       ${kpi('rear1')}${kpi('rear2')}${kpi('side')}
     </div>
