@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261023w';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261023y';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -148,7 +148,7 @@ async function migratePhotos(c) {
 /* 工程圖預覽（尺寸套印） */
 function renderDrawings(root) {
   const v = Drawings.valuesOf(cur);
-  $$('img[data-drawing]', root).forEach(img => Drawings.render(img.dataset.drawing, v[img.dataset.drawing]).then(u => { img.src = u; }).catch(e => { img.alt = e.message; }));
+  $$('img[data-drawing]', root).forEach(img => Drawings.render(img.dataset.drawing, v).then(u => { img.src = u; }).catch(e => { img.alt = e.message; }));
 }
 async function refreshFiles() { curFiles = cur ? await Store.filesOf(cur.id) : []; }
 
@@ -269,8 +269,8 @@ function itemParts(c, it, files) {
     case 'drawing': {
       const dv = Drawings.valuesOf(c);
       return [
-        { label: '正面工程圖（外伸撐座全伸寬度標註）', ok: isFinite(dv.front) },
-        { label: '側面工程圖（前輪中心至旋轉中心距離標註）', ok: isFinite(dv.side) },
+        { label: '正面工程圖（外伸撐座全伸寬度、前／後輪距標註）', ok: isFinite(dv.front) && isFinite(dv.B1) && isFinite(dv.B2) },
+        { label: '側面工程圖（軸距、前輪中心至旋轉中心距離、車高標註）', ok: isFinite(dv.side) && isFinite(dv.H) && isFinite(dv.h) },
         { label: '機具現場照片', ok: fileOk('sitePhoto') },
         { label: '吊鉤照片', ok: fileOk('hookPhoto') },
         { label: '車主聯', ok: fileOk('ownerCert') },
@@ -1691,9 +1691,9 @@ function boomTableHtml() {
 function uploadSections(part) {
   const drawing = `
   <div class="card"><h2>3. 組配圖（工程圖）</h2>
-    <p class="hint">正面、側面採用工程圖，尺寸自動套印（外伸撐座全伸寬度取自 S2-6 Lw、前輪中心至旋轉中心取自 S2-6 S），不需上傳或調整；修改尺寸請回 S2-6。</p>
-    <div class="eng-drawings"><figure><img data-drawing="front" alt="正面工程圖"><figcaption>正面圖－外伸撐座全張</figcaption></figure>
-      <figure><img data-drawing="side" alt="側面工程圖"><figcaption>側面圖－前輪與旋轉中心</figcaption></figure></div>
+    <p class="hint">正面、側面採用工程圖，尺寸自動套印（外伸撐座全伸寬度取自 S2-6 Lw、前輪中心至旋轉中心取自 S2-6 S；前／後輪距、軸距、車高取自 S2-2 車籍資料），不需上傳或調整；修改尺寸請回 S2-2／S2-6。</p>
+    <div class="eng-drawings"><figure><img data-drawing="front" alt="正面工程圖"><figcaption>正面圖－外伸撐座全張、輪距</figcaption></figure>
+      <figure><img data-drawing="side" alt="側面工程圖"><figcaption>側面圖－軸距、前輪與旋轉中心、車高</figcaption></figure></div>
     ${boomTableHtml()}</div>
   <div class="card"><h2>3. 機具照片</h2>
     <p class="hint">機具現場照片可上傳多張，產出 PDF 時依序附上；點縮圖可預覽。</p>

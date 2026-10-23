@@ -394,8 +394,8 @@ const PdfExport = (() => {
       await safe('組配工程圖（正面／側面）', async () => {
         log('產生組配工程圖…');
         const v = Drawings.valuesOf(c);
-        await B.addImageUrl(await Drawings.render('front', v.front), '正面圖（外伸撐座全張）－外伸撐座全伸寬度');
-        await B.addImageUrl(await Drawings.render('side', v.side), '側面圖－前輪中心至旋轉中心距離');
+        await B.addImageUrl(await Drawings.render('front', v), '正面圖（外伸撐座全張）－外伸撐座全伸寬度、前／後輪距');
+        await B.addImageUrl(await Drawings.render('side', v), '側面圖－軸距、前輪中心至旋轉中心距離、車高');
         // 伸臂各節長度表
         const st = (c.boom.stages_m || []).map(Number).filter(x => x > 0);
         if (st.length) {
