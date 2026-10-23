@@ -138,6 +138,15 @@ iframe.sub { width: 100%; height: calc(100vh - 190px); min-height: 600px; border
 .agree-row input { transform: scale(1.2); }
 .pdf-log { max-height: 180px; overflow: auto; background: #0f172a; color: #e2e8f0; font-family: Consolas, monospace; font-size: 12px; border-radius: 6px; padding: 6px 10px; }
 .pdf-log:empty { display: none; }
+/* PDF 產出進度條：逐頁擷取時顯示比例；其他步驟以流動條紋表示仍在運轉 */
+.pdf-prog { margin: 8px 0; padding: 10px 12px; border: 1px solid #c7d2fe; background: #eef2ff; border-radius: 8px; }
+.pdf-prog-head { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; color: #1e3a8a; font-size: .92rem; }
+.pdf-prog-head #pdfProgTime { font-weight: 500; color: #475569; white-space: nowrap; }
+.pdf-prog-bar { position: relative; height: 10px; margin: 8px 0 6px; background: #dbe3f7; border-radius: 6px; overflow: hidden; }
+.pdf-prog-bar i { display: block; height: 100%; width: 0; background: #2563eb; border-radius: 6px; transition: width .3s; }
+.pdf-prog.busy .pdf-prog-bar i { width: 100% !important; background: repeating-linear-gradient(45deg, #2563eb 0 12px, #60a5fa 12px 24px); background-size: 34px 34px; animation: pdfStripe .8s linear infinite; }
+@keyframes pdfStripe { from { background-position: 0 0; } to { background-position: 34px 0; } }
+.pdf-prog-sub { font-size: .8rem; color: #475569; }
 textarea.mono { width: 100%; min-height: 140px; font-family: Consolas, monospace; font-size: 12px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
 
 .steps-bar { display: flex; gap: 8px; margin: 6px 0 14px; flex-wrap: wrap; }

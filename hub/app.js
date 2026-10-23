@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261023p';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261023s';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -1465,8 +1465,10 @@ function syncDocs(c) {
   const num = (v) => N(v) > 0 ? N(v) : undefined;
   [['d', D.hook_d], ['B1', D.hook_B1], ['b1', D.hook_b1], ['h1', D.hook_h1], ['B2', D.hook_B2], ['b2', D.hook_b2], ['h2', D.hook_h2]].forEach(([k, v]) => { if (num(v) !== undefined) rhd.hook[k] = num(v); });
   if (num(D.rope_d) !== undefined) rhd.wire.d = num(D.rope_d);
-  if (ropeBreakKg(D) > 0) rhd.wire.Pbreak = ropeBreakKg(D);
+  // 破斷荷重：有材證取 S5-3 標準破斷荷重；勾「無材證」才帶入 d²/20 計算值；皆無則留空（不沿用舊值或預設值）
+  if (ropeBreakKg(D) > 0) rhd.wire.Pbreak = ropeBreakKg(D); else delete rhd.wire.Pbreak;
   if (num(D.rope_n) !== undefined) rhd.wire.n = num(D.rope_n);
+  rhd.wire.Sreq = 4.5;   // 移動式起重機安全檢查構造標準第 45 條：捲揚用鋼索安全係數 4.5 以上
   if (ok(D.rope_type)) rhd.wire.type = D.rope_type;
   if (r) { const rated = Math.max(0, r.maxVal - Wh); rhd.hook.Q = rated; rhd.wire.Wrated = rated; }
   // 吊鉤尺寸 mm；無材質證明：抗拉強度取 45 kg/mm²（4500 kg/cm²）
@@ -1633,7 +1635,7 @@ function pStep5(pane) {
     </div>
     <label class="agree-row" style="margin:8px 0 0"><input type="checkbox" data-k="docs.rope_nocert" ${cur.docs.rope_nocert ? 'checked' : ''}> 無鋼索材質證明（選填）：改以最低強度 d²／20（公噸）估算破斷荷重</label>
     <p class="hint">原廠計算之吊升荷重較大，以最低強度估算多半無法通過安全係數檢核，建議依材質證明填寫標準破斷荷重。</p>
-    ${r ? `<p class="hint">鋼索額定荷重將以 S4 最大荷重 ${r.maxVal} kg − 吊具 ${Calc.effective(cur).vals.Wh} kg 計算安全係數（須 ≧ 5.0）。</p>` : ''}
+    ${r ? `<p class="hint">鋼索額定荷重將以 S4 最大荷重 ${r.maxVal} kg − 吊具 ${Calc.effective(cur).vals.Wh} kg 計算安全係數（須 ≧ 4.5，構造標準第 45 條）。</p>` : ''}
   </div>
   <div class="card">
     <h2>S5-4　吊鉤尺寸（實測，單位 mm）</h2>
@@ -1740,7 +1742,7 @@ function ropeStatusHtml() {
   const x = Store.subGet(cur.id, 'crane3t_rope_hook_result'), i = ropeHookSyncInfo(cur), why = [];
   if (!i.r) why.push('S4 荷重表反算目前沒有有效結果（請確認 S1～S4 皆為「完成」）');
   else if (!i.ok) why.push(`本計算書之額定荷重 W<sub>rated</sub> ＝ ${i.wire || '—'} kg、吊鉤 Q ＝ ${i.hook || '—'} kg，與 S4 結果不一致（新荷重表最大值 ${i.r.maxVal} kg − 吊具 ${Calc.effective(cur).vals.Wh} kg ＝ <b>${i.rated} kg</b>）`);
-  if (x && !x.wireOk) why.push('鋼索安全係數未達 5.0');
+  if (x && !x.wireOk) why.push('鋼索安全係數未達 4.5');
   if (x && !x.hookOk) why.push('吊鉤安全係數未達 3.0');
   if (!x) why.push('計算書尚未開啟計算，請稍候或重新整理');
   return why.length ? `<div class="callout warn"><b>本文件標示「進行中」的原因：</b><ul>${why.map(w => `<li>${w}</li>`).join('')}</ul>
@@ -1786,6 +1788,11 @@ function openPdfModal() {
     ${cur.needReapply ? '<div class="callout danger">S1～S6 的資料在套用後有變更，申請文件尚未更新；建議先按左側「套用到申請文件」。</div>' : ''}
     <p class="hint">依「文件需求一覽」順序串接：封面＋目錄（含頁次）→ 各文件 → 上傳之附件（PDF 以原頁合併）。頁數多時約需 1–3 分鐘，請勿關閉網頁。</p>
     <div style="display:grid;gap:4px;margin:8px 0">${PDF_SECTIONS.map(([k, l]) => `<label class="agree-row" style="margin:0;font-weight:500"><input type="checkbox" data-sec="${k}" checked> ${l}</label>`).join('')}</div>
+    <div id="pdfProg" class="pdf-prog" hidden>
+      <div class="pdf-prog-head"><span id="pdfProgStep">準備中…</span><span id="pdfProgTime">0:00</span></div>
+      <div class="pdf-prog-bar"><i id="pdfProgFill"></i></div>
+      <div class="pdf-prog-sub" id="pdfProgSub">處理中，請勿關閉網頁</div>
+    </div>
     <div id="pdfLog" class="pdf-log"></div>`;
   $('#btnPdfGo').disabled = false; $('#btnPdfGo').style.display = ''; $('#btnPdfGo').textContent = '開始產出';
   $('#btnPdfOpen').style.display = 'none'; $('#btnPdfSave').style.display = 'none';
@@ -1794,7 +1801,17 @@ function openPdfModal() {
 $('#btnPdfClose').addEventListener('click', () => $('#pdfModal').close());
 $('#btnPdfGo').addEventListener('click', async () => {
   const sections = {}; $$('#pdfBody [data-sec]').forEach(el => sections[el.dataset.sec] = el.checked);
-  const logEl = $('#pdfLog'); const log = (m) => { logEl.insertAdjacentHTML('beforeend', `<div>${esc(m)}</div>`); logEl.scrollTop = logEl.scrollHeight; };
+  const logEl = $('#pdfLog'); const log = (m) => { logEl.insertAdjacentHTML('beforeend', `<div>${esc(m)}</div>`); logEl.scrollTop = logEl.scrollHeight;
+    if (!/^[⚠✅❌　]/.test(m)) { $('#pdfProgStep').textContent = m.replace(/…$/, ''); $('#pdfProgSub').textContent = '處理中，請勿關閉網頁'; $('#pdfProg').classList.add('busy'); } };
+  // 進度條：逐頁擷取時顯示「第 n／N 頁」與比例；其餘步驟以流動條紋表示仍在運轉；並顯示經過時間
+  log.progress = (done, total) => {
+    const pct = total ? Math.round(done / total * 100) : 0;
+    $('#pdfProg').classList.remove('busy'); $('#pdfProgFill').style.width = pct + '%';
+    $('#pdfProgSub').textContent = done < total ? `正在擷取第 ${done + 1}／${total} 頁（${pct}%），每頁約需數秒，請勿關閉網頁` : `已擷取 ${total} 頁`;
+  };
+  const t0 = Date.now(), tick = () => { const s = Math.floor((Date.now() - t0) / 1000); $('#pdfProgTime').textContent = `已經過 ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  $('#pdfProg').hidden = false; $('#pdfProg').classList.add('busy'); $('#pdfProgFill').style.width = '0%'; tick();
+  const timer = setInterval(tick, 1000);
   // 產出期間隱藏「開始產出」、鎖定勾選項，避免重複點擊
   $('#btnPdfGo').disabled = true; $('#btnPdfGo').style.display = 'none';
   $('#btnPdfOpen').style.display = 'none'; $('#btnPdfSave').style.display = 'none';
@@ -1812,6 +1829,7 @@ $('#btnPdfGo').addEventListener('click', async () => {
     log(`✅ 完成，共 ${pages} 頁、${(blob.size / 1048576).toFixed(1)} MB。可「開啟預覽」直接列印，或下載保存。`);
   } catch (e) { log('❌ 產出失敗：' + (e.message || e)); }
   finally {
+    clearInterval(timer); tick(); $('#pdfProg').hidden = true;
     $$('#pdfBody [data-sec]').forEach(el => el.disabled = false);
     $('#btnPdfGo').disabled = false; $('#btnPdfGo').textContent = '🔄 重新產出'; $('#btnPdfGo').style.display = '';
   }

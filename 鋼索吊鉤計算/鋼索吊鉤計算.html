@@ -1183,10 +1183,6 @@
         </div>
       </div>
 
-      <div class="note-box">
-        備註：1. 吊鉤抗拉強度係依材質規範（如 S45C 抗拉強度 σt ≥ 70 kg/mm²（7,000 kg/cm²））。<br>
-        2. 依規定移動式起重機吊鉤於額定荷重作用下，各危險斷面之合成應力所計算之安全係數均應大於 3.0。
-      </div>
     </div>
 
 
@@ -1261,9 +1257,9 @@
             <td>4-</td>
             <td class="text-left">鋼索斷裂負荷（破斷力）</td>
             <td><b>P<sub>break</sub></b></td>
-            <td><input type="number" class="num-input" id="wire_Pbreak" value="21700" step="any" oninput="recalcWire()"></td>
+            <td><input type="number" class="num-input" id="wire_Pbreak" value="" step="any" oninput="recalcWire()"></td>
             <td>㎏</td>
-            <td class="text-left">依 d²／20（公噸）計算</td>
+            <td class="text-left" id="wire_Pbreak_note">依 d²／20（公噸）計算</td>
           </tr>
           <tr>
             <td>5-</td>
@@ -1277,9 +1273,9 @@
             <td>6-</td>
             <td class="text-left">法定安全係數基準</td>
             <td><b>S<sub>req</sub></b></td>
-            <td><input type="number" class="num-input" id="wire_Sreq" value="5.0" step="any" oninput="recalcWire()"></td>
+            <td><input type="number" class="num-input" id="wire_Sreq" value="4.5" step="any" oninput="recalcWire()"></td>
             <td>—</td>
-            <td class="text-left">起重升降機具安全規則規定：≥ 5.0</td>
+            <td class="text-left">移動式起重機安全檢查構造標準第 45 條：捲揚用鋼索 ≥ 4.5</td>
           </tr>
           <tr>
             <td>7-</td>
@@ -1350,7 +1346,7 @@
           </span>
           <span class="step-result" id="res_wire_S" style="font-size:18px; color:#1e40af;">5.449</span>
           <span class="step-unit" style="min-width:160px;" id="badge_wire_S">
-            <span class="badge badge-ok" style="font-size:14px;">＞ 5.0 →【合格 OK!】</span>
+            <span class="badge badge-ok" style="font-size:14px;">≧ 4.5 →【合格 OK!】</span>
           </span>
         </div>
 
@@ -1379,14 +1375,14 @@
             <span class="item-val" id="sum_wire_sf" style="color:var(--primary);">S ＝ 5.449</span>
           </div>
           <div class="summary-item">
-            <span class="item-title">法規判定 (基準 ≥ <span id="sum_wire_req">5.0</span>)</span>
+            <span class="item-title">法規判定 (基準 ≥ <span id="sum_wire_req">4.5</span>)</span>
             <span class="item-val" id="sum_wire_judge" style="color:var(--ok-color);">合格 (OK!)</span>
           </div>
         </div>
       </div>
 
       <div class="note-box">
-        法規說明：依據《起重升降機具安全規則》第 55 條規定，起重機之捲揚鋼索安全係數不得小於 5.0。本檢算結果實際安全係數大於法定基準，符合安全標準。
+        法規說明：依移動式起重機安全檢查構造標準第 45 條規定，鋼索安全係數 ＝ 鋼索之斷裂荷重 ／ 鋼索所承受之最大荷重，捲揚用鋼索應為 4.5 以上。
       </div>
     </div>
 
@@ -1716,6 +1712,13 @@
       setT('txt_wire_n', fmt(n, 0));
       setT('res_wire_Psingle', fmt(PsingleRound, 0));
 
+      // 破斷荷重備註依來源：等於 d²/20（公噸）最低值時註明公式，否則為鋼索規格／破斷荷重證明值
+      const PminKg = dw > 0 ? dw * dw / 20 * 1000 : NaN;
+      setT('wire_Pbreak_note', !(Pbreak > 0) ? '未填：請於主控台 S5-3 填寫標準破斷荷重（依材質證明），或勾選「無鋼索材質證明」'
+        : isFinite(PminKg) && Math.abs(Pbreak - PminKg) < 1
+        ? '依 d²／20（公噸）計算之最低破斷荷重'
+        : '依鋼索規格（製造商破斷荷重證明）' + (isFinite(PminKg) ? '；d²／20 最低值為 ' + fmt(PminKg, 0) + ' kg' : ''));
+
       // Update Step 9
       setT('txt_wire_Pbreak', fmt(Pbreak, 0));
       setT('txt_wire_eta', fmt(eta, 3));
@@ -1725,7 +1728,7 @@
       // Wire Safety Factor Badge
       const isWireOk = S >= Sreq;
       setH('badge_wire_S', isWireOk 
-        ? `<span class="badge badge-ok" style="font-size:14px;">＞ ${fmt(Sreq,1)} →【合格 OK!】</span>` 
+        ? `<span class="badge badge-ok" style="font-size:14px;">≧ ${fmt(Sreq,1)} →【合格 OK!】</span>` 
         : `<span class="badge badge-ng" style="font-size:14px;">＜ ${fmt(Sreq,1)} →【不合格 NG】</span>`);
 
       // Summary Card
@@ -1752,19 +1755,19 @@
     const PRESETS = {
       preset_excel: {
         hook: { Q: 4950, d: 94, B1: 53, b1: 16, h1: 77, B2: 52, b2: 16, h2: 62, mat: 'S45C:70', sigmat: 70, theta: 60, sf_req: 3.0 },
-        wire: { d: 20, Wrated: 15000, Whook: 150, Pbreak: 21700, n: 4, Sreq: 5.0, eta: 0.951, type: '6×Fi(29)＋IWRC 鍍鋅鋼索 1770 N/mm²' }
+        wire: { d: 20, Wrated: 15000, Whook: 150, Pbreak: 21700, n: 4, Sreq: 4.5, eta: 0.951, type: '6×Fi(29)＋IWRC 鍍鋅鋼索 1770 N/mm²' }
       },
       preset_293t: {
         hook: { Q: 2930, d: 75, B1: 42, b1: 14, h1: 60, B2: 40, b2: 14, h2: 50, mat: 'S45C:70', sigmat: 70, theta: 60, sf_req: 3.0 },
-        wire: { d: 8, Wrated: 2930, Whook: 30, Pbreak: 4350, n: 2, Sreq: 5.0, eta: 0.97, type: '6×WS(26)＋IWRC 8mm 破斷荷重 4,350 kg' }
+        wire: { d: 8, Wrated: 2930, Whook: 30, Pbreak: 4350, n: 2, Sreq: 4.5, eta: 0.97, type: '6×WS(26)＋IWRC 8mm 破斷荷重 4,350 kg' }
       },
       preset_293t_4fall: {
         hook: { Q: 2930, d: 75, B1: 42, b1: 14, h1: 60, B2: 40, b2: 14, h2: 50, mat: 'S45C:70', sigmat: 70, theta: 60, sf_req: 3.0 },
-        wire: { d: 8, Wrated: 2930, Whook: 45, Pbreak: 4350, n: 4, Sreq: 5.0, eta: 0.951, type: '6×WS(26)＋IWRC 8mm 破斷荷重 4,350 kg' }
+        wire: { d: 8, Wrated: 2930, Whook: 45, Pbreak: 4350, n: 4, Sreq: 4.5, eta: 0.951, type: '6×WS(26)＋IWRC 8mm 破斷荷重 4,350 kg' }
       },
       preset_platform: {
         hook: { Q: 580, d: 60, B1: 35, b1: 12, h1: 48, B2: 32, b2: 12, h2: 40, mat: 'S45C:70', sigmat: 70, theta: 60, sf_req: 3.0 },
-        wire: { d: 8, Wrated: 580, Whook: 25, Pbreak: 4350, n: 2, Sreq: 5.0, eta: 0.97, type: '6×WS(26)＋IWRC 8mm 破斷荷重 4,350 kg (搭乘設備規範)' }
+        wire: { d: 8, Wrated: 580, Whook: 25, Pbreak: 4350, n: 2, Sreq: 4.5, eta: 0.97, type: '6×WS(26)＋IWRC 8mm 破斷荷重 4,350 kg (搭乘設備規範)' }
       }
     };
 
@@ -1887,7 +1890,7 @@
             if (data.wire.Whook !== undefined) document.getElementById('wire_Whook').value = data.wire.Whook;
             if (data.wire.Pbreak !== undefined) document.getElementById('wire_Pbreak').value = data.wire.Pbreak;
             if (data.wire.n !== undefined) document.getElementById('wire_n').value = data.wire.n;
-            if (data.wire.Sreq !== undefined) document.getElementById('wire_Sreq').value = data.wire.Sreq;
+            if (data.wire.Sreq !== undefined) document.getElementById('wire_Sreq').value = Number(data.wire.Sreq) === 5 ? 4.5 : data.wire.Sreq;   // 舊預設 5.0 → 構造標準第 45 條 4.5
             if (data.wire.eta !== undefined) document.getElementById('wire_eta').value = data.wire.eta;
             if (data.wire.type !== undefined) document.getElementById('wire_type').value = data.wire.type;
           }

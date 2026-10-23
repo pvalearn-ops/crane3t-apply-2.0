@@ -56,8 +56,8 @@ const PdfExport = (() => {
   }
 
   /* ---------- 可換頁位置：區塊頂端（不在公式框、圖片、表格列等不可分割區塊內部） ---------- */
-  const ATOMIC = 'tr, .formula, .imgslot, figure, .resultline, .kpi, .note, .callout, .a1method, img, canvas, svg, .sec-row, .blk, .cover, .kv, h1, h2, h3, h4';
-  const BLOCKS = 'tr, h1, h2, h3, h4, p, li, table, .formula, .imgslot, figure, .resultline, .kpi, .note, .callout, .a1method, .tbl-scroll, .doc-header, .footer-row, .desc-p, .sec-row, .blk, .rtbl, .kv, .eq';
+  const ATOMIC = 'tr, .step-row, .formula, .imgslot, figure, .resultline, .kpi, .note, .callout, .a1method, img, canvas, svg, .sec-row, .blk, .cover, .kv, h1, h2, h3, h4';
+  const BLOCKS = 'tr, .step-row, h1, h2, h3, h4, p, li, table, .formula, .imgslot, figure, .resultline, .kpi, .note, .callout, .a1method, .tbl-scroll, .doc-header, .footer-row, .desc-p, .sec-row, .blk, .rtbl, .kv, .eq';
   function safeBreaks(el) {
     const base = el.getBoundingClientRect().top, out = new Set();
     el.querySelectorAll(BLOCKS).forEach(n => {
@@ -175,6 +175,11 @@ const PdfExport = (() => {
 
   class Builder {
     constructor(log) { this.log = log; this.toc = []; this.cur = null; }
+    /* 逐頁擷取進度（第 done／total 頁）：交給主控台更新進度條，並讓畫面有機會重繪 */
+    async progress(done, total) {
+      if (this.log && this.log.progress) this.log.progress(done, total);
+      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+    }
     async init() {
       await loadScript(LIB.pdflib, window, w => w.PDFLib);
       await loadScript(LIB.h2c, window, w => w.html2canvas);
@@ -317,7 +322,8 @@ const PdfExport = (() => {
         await loadScript(LIB.h2c, win, w => w.html2canvas);
         const els = Array.from(doc.querySelectorAll(opt.selector)).filter(e => e.offsetHeight > 0);
         if (!els.length) throw new Error('找不到列印區塊');
-        for (const el of els) {
+        for (const [i, el] of els.entries()) {
+          await this.progress(i, els.length);
           if (opt.flatten !== false) flattenForms(doc, el);
           const elW = fixWidth(fr, doc, el);
           const land = opt.landscapeIf ? opt.landscapeIf(el) : undefined;
@@ -334,6 +340,7 @@ const PdfExport = (() => {
           const k = cv.height / (el.getBoundingClientRect().height || cv.height);
           await this.addCanvas(cv, { landscape: land, fit: !!opt.fit || !!opt.fillA4, breaks: brk.map(v => v * k) });
         }
+        await this.progress(els.length, els.length);
         if (opt.after) await opt.after(win, doc);
       } finally { fr.remove(); }
     }
