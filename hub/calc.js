@@ -7,7 +7,7 @@
  * 令 SF = 1.15 反解吊升荷重上限：
  *   Wa_max = (Ko + Wh − 0.15·Wp) / 1.15
  * 伸臂強度：取 S3 伸臂強度計算書產生之「各伸臂長度 × 作業半徑之允許荷重」（應力比 ≦ 1）。
- * 新荷重值 = min［原廠值（或原吊升荷重）、安定度上限、伸臂強度上限］，降至 0 者為不可作業。
+ * 新荷重值 = min［原廠值、S1 吊升荷重、安定度上限、伸臂強度上限］，降至 0 者為不可作業。
  * （本版有伸臂強度計算，不再以 (搭乘設備重量＋載重)×2＋吊具 作為吊升荷重上限。）
  */
 const Calc = (() => {
@@ -278,7 +278,8 @@ const Calc = (() => {
           rUse = pc.rOverride || r;
           if (pc.rOverride) note = '(' + pc.rOverride + 'm)';
           const st = stabLimit(PP, B, Lcm, rUse * 100), str = strAt(Lm, rUse);
-          const cand = [['stab', st.Wa], ['str', str], ['orig', pc.val]].filter(x => isFinite(x[1]));
+          // S1 吊升荷重為上限：原廠表格值超過時亦以吊升荷重限制
+          const cand = [['stab', st.Wa], ['str', str], ['orig', pc.val], ['orig', origCapKg > 0 ? origCapKg : NaN]].filter(x => isFinite(x[1]));
           cand.sort((a, b) => a[1] - b[1]);
           val = cand[0][1]; gov = cand[0][0];
           cells[ri][ci] = { origVal: pc.val, stab: st.Wa, str };
