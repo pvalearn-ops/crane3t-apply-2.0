@@ -1376,7 +1376,7 @@ function buildPrint() {
       o += `<div class="sheet">${ph('6. 計算明細')}<h2>6. 各斷面最不利性能計算明細 — 斷面 ${secName(k)}（${caseTxt(m.gov)}）</h2><div class="formula">${detailHTML(C, m.gov.s, m.gov.r, k)}</div></div>`;
     });
   }
-  o += `<div class="sheet">${ph('附錄　吊升荷重表')}<h2>附錄　吊升荷重表</h2>${loadChartHTML()}</div>`;
+  o += `<div class="sheet">${ph('附錄　吊升荷重表')}<h2>附錄　吊升荷重表</h2>${loadChartHTML()}<p style="font-weight:700;margin-top:8px">註：本表重量為額定總荷重（含吊鉤自重）。</p></div>`;
   $('#print').innerHTML = o;
   $('#pageStyle').textContent = `@page{size:A4 portrait;margin:12mm 12mm 14mm;@bottom-center{content:"第 " counter(page) " 頁 / 共 " counter(pages) " 頁";font-size:8pt}}
     @page land{size:A4 landscape;margin:9mm 10mm 11mm}`;
@@ -1635,15 +1635,17 @@ function mergeSelf(sd) {
   S.design.thetaFromR = true;
   const E = S.est;
   E.m = Math.max(1, Math.min(n, sd.m || E.m || 2));
-  // 位置：已輸入者保留，空白才補推估值
+  // 位置：伸臂頭端 X 一律依 S1-3 伸臂長度更新；斷面位置若仍為舊預設值則隨之重算，自行輸入者保留
   if (sd.X && sd.X.length === n) {
-    sd.X.forEach((x, k) => { if (!isNum(E.X[k])) E.X[k] = x; });
+    const oldX = E.X.slice();
     fixOldXsec(E);
+    for (let k = 1; k < n; k++) if (isNum(oldX[k - 1]) && isNum(E.Xsec[k]) && Math.abs(E.Xsec[k] - xsecDefault(oldX, k, n)) < 0.05) E.Xsec[k] = null;
+    E.X = sd.X.slice();
     for (let k = 0; k < n; k++) if (!isNum(E.Xsec[k])) E.Xsec[k] = xsecDefault(E.X, k, n);
     fixXpin(E);
   }
-  // 重量：S2-5 為原廠／實測值時覆寫；推估值只補空白
-  const putG = (it, v) => { if (isNum(v) && (sd.wManual || !isNum(it.G))) it.G = v; };
+  // 重量：一律以 S2-5 為準（原廠／實測值或推估值皆覆寫；本函式只在使用者按「依 S1／S2 重新帶入」時執行）
+  const putG = (it, v) => { if (isNum(v)) it.G = v; };
   const others = E.items.filter(it => it.kind === 'att');
   const booms = Array.from({ length: n - 1 }, (_, k) => E.items.find(it => it.kind === 'boom' && Number(it.boom) === k + 2) || { name: `伸臂(${k + 2}) 重量`, G: null, kind: 'boom', boom: k + 2, cyl: 1, X: null });
   booms.forEach((it, k) => putG(it, sd.segW && sd.segW[k + 1]));

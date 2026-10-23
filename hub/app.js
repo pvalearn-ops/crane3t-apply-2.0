@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261023y';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261024c';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -575,7 +575,8 @@ function s13Html() {
     <h2>S1-3　荷重性能表與伸臂資料</h2>
     ${cur.hasChart ? `<p class="hint">來源：${cur.chartSource === 'ai' ? 'AI 判讀（請務必逐格核對）' : cur.chartSource === 'manual' ? '自行輸入' : '資料庫 ' + esc(cur.crane.dbModel || '')}。
       <b>表頭各欄伸臂長度即為各伸出狀態之伸臂總長</b>（由全縮到全伸，自伸臂腳銷量至頂端滑輪銷），S2～S4 一律以此為準；此表亦為 S4 荷重表反算之上限（原廠值）及 S3 伸臂強度計算之荷重點。</p>
-    <div id="chartEditor"></div>`
+    <div id="chartEditor"></div>
+    <p class="hint" style="margin-top:6px"><b>註：本表重量為額定總荷重（含吊鉤自重）。</b></p>`
     : `<p class="hint">沒有荷重性能表：請實測<b>每一個伸出狀態時的伸臂總長</b>（由全縮到全伸，單位 m），<b>自伸臂腳銷中心量至頂端滑輪銷中心</b>，例如 5 節伸臂：3.15、5.15、7.05、8.95、10.85。全伸長度即為伸臂強度計算之頂端滑輪銷位置。</p>
     <div class="stage-list">${stages.map((v, i) => `<label class="field"><span>${i === 0 ? '全縮（第1節）' : '伸出至第 ' + (i + 1) + ' 節'}</span><div class="unit-in"><input data-st="${i}" value="${esc(v)}" inputmode="decimal" class="${N(v) > 0 ? '' : 'missing'}"><em>m</em></div></label>`).join('')}
       <button class="btn btn-outline" id="stAdd">➕</button><button class="btn btn-danger-outline" id="stDel">➖</button></div>`}
@@ -1252,7 +1253,7 @@ function pStep3(pane) {
   <div class="callout info">計算書（A4 列印版）會在按左側「✅ 套用到申請文件」後，列於申請文件「6. 強度計算書」的第一份。</div>
   <div class="btn-row"><a class="btn btn-primary" href="#case=${cur.id}&p=step4">下一步：S4 荷重表反算 →</a></div>`;
   $('#btnBoomReseed', pane).onclick = () => {
-    if (!confirm('以 S1／S2 的資料更新伸臂強度計算？\n\n會更新：伸臂長度與荷重點（S1-3）、油壓缸支數、各部重量（S2-5 為手動輸入之原廠／實測值時）。\n會保留：斷面尺寸、設計條件、各部位置等已輸入的資料。\n（S1 改選資料庫原廠機型時，則改用原廠資料。）')) return;
+    if (!confirm('以 S1／S2 的資料更新伸臂強度計算？\n\n會更新：伸臂長度與荷重點（S1-3）、油壓缸支數、各部重量（一律以 S2-5 為準，S3 中直接修改的重量會被覆蓋）。\n會保留：斷面尺寸、設計條件、自行輸入的斷面位置等資料（伸臂頭端位置依 S1-3 伸臂長度更新）。\n（S1 改選資料庫原廠機型時，則改用原廠資料。）')) return;
     Store.subSet(cur.id, 'boomStrength_seed', boomSeed(cur));
     pStep3(pane);
   };
@@ -1354,7 +1355,7 @@ function applyToDocs() {
   // 荷重表
   Store.subSet(id, 'crane_load_chart_data', {
     docTitle: '吊升荷重表', unit: 'kg',
-    notes: `本性能表只限用於外撐伸座最大張出之側及後方。表列為吊升荷重（含吊具 ${Calc.effective(c).vals.Wh} kg），各值均經伸臂強度及安定度檢核。`
+    notes: `本表重量為額定總荷重（含吊鉤自重 ${Calc.effective(c).vals.Wh} kg）。本性能表只限用於外撐伸座最大張出之側及後方，各值均經伸臂強度及安定度檢核。`
       + (res.cells.some(row => row.some(x => x && x.gov === 'stab' && x.val > 0)) ? '灰底斜體之數值由安定度決定。' : '')
       + (res.unstableCount ? '表中標示「不可作業」之作業半徑，因伸臂強度或安定度不足，不得作業。' : ''),
     booms: res.booms.map(String), ropes: res.booms.map((_, i) => (c.origChart.ropes || [])[i] || ''),
@@ -1691,9 +1692,9 @@ function boomTableHtml() {
 function uploadSections(part) {
   const drawing = `
   <div class="card"><h2>3. 組配圖（工程圖）</h2>
-    <p class="hint">正面、側面採用工程圖，尺寸自動套印（外伸撐座全伸寬度取自 S2-6 Lw、前輪中心至旋轉中心取自 S2-6 S；前／後輪距、軸距、車高取自 S2-2 車籍資料），不需上傳或調整；修改尺寸請回 S2-2／S2-6。</p>
+    <p class="hint">正面、側面採用工程圖，尺寸自動套印（外伸撐座全伸寬度取自 S2-6 Lw、前輪中心至旋轉中心取自 S2-6 S；前／後輪距、軸距、車高取自 S2-2 車籍資料；伸臂軸心至旋轉中心取自 S3 伸臂腳銷偏移 a，預設 20 cm），不需上傳或調整；修改尺寸請回 S2-2／S2-6。</p>
     <div class="eng-drawings"><figure><img data-drawing="front" alt="正面工程圖"><figcaption>正面圖－外伸撐座全張、輪距</figcaption></figure>
-      <figure><img data-drawing="side" alt="側面工程圖"><figcaption>側面圖－軸距、前輪與旋轉中心、車高</figcaption></figure></div>
+      <figure><img data-drawing="side" alt="側面工程圖"><figcaption>側面圖－軸距、前輪與旋轉中心、伸臂軸心、車高</figcaption></figure></div>
     ${boomTableHtml()}</div>
   <div class="card"><h2>3. 機具照片</h2>
     <p class="hint">機具現場照片可上傳多張，產出 PDF 時依序附上；點縮圖可預覽。</p>

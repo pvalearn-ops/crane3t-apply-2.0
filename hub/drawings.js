@@ -19,8 +19,8 @@ const Drawings = (() => {
   const ANCHOR = {
     // 左、右外伸撐座中心（底板下緣）；top：中心線起點；tireL／tireR：左右前輪中心 x，tireY：輪胎接地 y
     front: { a: [300, 1316], b: [1827, 1316], top: 1100, tireL: 770, tireR: 1352, tireY: 1303 },
-    // 前輪中心、起重機旋轉中心（旋轉座軸線）；rear：後輪中心；ground：前輪接地 y；topY／topX：車輛最高點（伸臂收納）
-    side: { a: [389, 1310], b: [668, 1310], top: 880, rear: [1521, 1312], ground: 1448, topY: 627, topX: 1097 }
+    // 前輪中心、起重機旋轉中心（旋轉座軸線）；rear：後輪中心；ground：前輪接地 y；topY／topX：車輛最高點（伸臂收納）；pin：伸臂腳銷（伸臂軸心）
+    side: { a: [389, 1310], b: [668, 1310], top: 880, rear: [1521, 1312], ground: 1448, topY: 627, topX: 1097, pin: [615, 755] }
   };
   const TITLE = { front: '外伸撐座全伸寬度', side: '前輪中心至旋轉中心距離' };
   const RED = '#c0392b', FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
@@ -48,10 +48,14 @@ const Drawings = (() => {
   const mmTxt = (mm) => isFinite(mm) && mm > 0 ? Math.round(mm).toLocaleString('en-US') + ' mm' : '（未填）';
 
   /* 尺寸值（mm）：Lw、S、輪距、軸距、車高（cm × 10；未實測者為預設值或「未填」）
+     a：伸臂軸心（腳銷）至旋轉中心距離，取 S3 伸臂強度計算「伸臂腳銷在迴轉中心後方之距離 a」（m），未建立 S3 時用預設 0.2 m
      front／side 為主要標註值（保留供完整度檢核）。 */
+  const A_DEFAULT_M = 0.2;
   function valuesOf(c) {
     const EV = Calc.effective(c).vals, n = Calc.num, mm = (v) => n(v) > 0 ? n(v) * 10 : NaN;
-    return { front: mm(c.stab.Lw), side: mm(EV.S), B1: mm(EV.B1), B2: mm(EV.B2), H: mm(c.vehicle.wheelbase_cm), h: mm(c.vehicle.height_cm) };
+    const bs = c && c.id && typeof Store !== 'undefined' ? Store.subGet(c.id, 'boomStrengthCalc.v1') : null;
+    const rOff = bs && bs.design && isFinite(n(bs.design.rOff)) ? n(bs.design.rOff) : A_DEFAULT_M;
+    return { front: mm(c.stab.Lw), side: mm(EV.S), B1: mm(EV.B1), B2: mm(EV.B2), H: mm(c.vehicle.wheelbase_cm), h: mm(c.vehicle.height_cm), a: rOff * 1000 };
   }
   /* 回傳 JPEG dataURL；v 為 valuesOf() 之結果（相容舊呼叫：傳入單一數值時只標主要尺寸） */
   async function render(kind, v) {
@@ -84,6 +88,14 @@ const Drawings = (() => {
       // 第 2 排：前輪中心至旋轉中心距離
       centerLine(g, bx, A.top, y2 + 30);
       dimH(g, CW, ax, bx, y2, `${TITLE.side}　${mmTxt(v.side)}`, 62);
+      // 伸臂軸心（腳銷）至旋轉中心距離 a：標於伸臂上方空白處；間距窄，箭頭由外側指入
+      const [px, py] = A.pin, ya = 545;
+      cross(g, px, py);
+      centerLine(g, px, py - 20, ya - 30); centerLine(g, bx, A.top, ya - 30);
+      g.beginPath(); g.moveTo(px - 90, ya); g.lineTo(bx + 90, ya); g.stroke();
+      arrow(g, px, ya, 1); arrow(g, bx, ya, -1);
+      g.font = `bold 52px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'bottom';
+      g.fillText(`伸臂軸心至旋轉中心距離　${isFinite(v.a) ? Math.round(v.a).toLocaleString('en-US') + ' mm' : '（未填）'}`, (px + bx) / 2 + 120, ya - 40);
       // 車高：地面至車輛最高點（右側垂直尺寸）
       const xd = W + 120;
       g.lineWidth = 3;
