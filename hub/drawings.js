@@ -5,7 +5,17 @@
    尺寸取自 S2-6，使用者不需上傳或調整；錨點為圖檔上之像素座標（2000 × 1493）。
    ============================================================ */
 const Drawings = (() => {
-  const SRC = { front: '照片/工程圖_正面.jpg', side: '照片/工程圖_側面.jpg' };
+  // 圖檔改用內嵌 data URL（hub/drawings-img.js，首次需要時才載入）：
+  // 以 file:// 開啟時，直接讀 照片/工程圖_*.jpg 會使 canvas 被視為跨來源而無法 toDataURL
+  const IMG_JS = 'hub/drawings-img.js?v=20261023b';
+  let imgJs = null;
+  const embedded = () => imgJs || (imgJs = new Promise((res, rej) => {
+    if (window.DRAWING_IMG) return res(window.DRAWING_IMG);
+    const s = document.createElement('script'); s.src = IMG_JS;
+    s.onload = () => window.DRAWING_IMG ? res(window.DRAWING_IMG) : rej(new Error('工程圖資料載入失敗'));
+    s.onerror = () => { imgJs = null; rej(new Error('工程圖資料載入失敗：' + IMG_JS)); };
+    document.head.appendChild(s);
+  }));
   const ANCHOR = {
     front: { a: [300, 1316], b: [1827, 1316], top: 1100 },   // 左、右外伸撐座中心（底板下緣）；top：中心線起點
     side: { a: [386, 1306], b: [668, 1306], top: 880 }       // 前輪中心、起重機旋轉中心（旋轉座軸線）
@@ -13,9 +23,9 @@ const Drawings = (() => {
   const TITLE = { front: '外伸撐座全伸寬度', side: '前輪中心至旋轉中心距離' };
   const RED = '#c0392b', FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
   const cache = {};
-  const load = (src) => cache[src] || (cache[src] = new Promise((res, rej) => {
-    const i = new Image(); i.onload = () => res(i); i.onerror = () => { delete cache[src]; rej(new Error('工程圖載入失敗：' + src)); }; i.src = src;
-  }));
+  const load = (kind) => cache[kind] || (cache[kind] = embedded().then(D => new Promise((res, rej) => {
+    const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('工程圖載入失敗：' + kind)); i.src = D[kind];
+  })).catch(e => { delete cache[kind]; throw e; }));
 
   function arrow(g, x, y, dir) {
     g.beginPath(); g.moveTo(x, y); g.lineTo(x - dir * 34, y - 13); g.lineTo(x - dir * 34, y + 13); g.closePath(); g.fill();
@@ -27,7 +37,7 @@ const Drawings = (() => {
   }
   /* 回傳 JPEG dataURL */
   async function render(kind, mm) {
-    const img = await load(SRC[kind]);
+    const img = await load(kind);
     const W = img.naturalWidth, H = img.naturalHeight, extra = 230;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H + extra;
     const g = cv.getContext('2d');

@@ -176,7 +176,8 @@ textarea.mono { width: 100%; min-height: 140px; font-family: Consolas, monospace
 /* 左側：套用到申請文件 */
 .apply-box { margin: 10px 8px 4px; padding: 10px; border: 1px dashed #93c5fd; border-radius: 10px; background: #eff6ff; display: grid; gap: 6px; }
 .apply-box .btn { width: 100%; justify-content: center; }
-.apply-box .btn:disabled { opacity: .5; cursor: not-allowed; }
+/* 停用中的按鈕（如警示視窗尚未勾選同意）：變灰、不可點，讓使用者一眼看出還不能按 */
+.btn:disabled, .btn:disabled:hover { opacity: .45; filter: grayscale(1); cursor: not-allowed; box-shadow: none; }
 .apply-box small { color: #475569; font-size: .78rem; line-height: 1.4; }
 /* S1 荷重表取得方式 */
 .seg { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; width: fit-content; max-width: 100%; }

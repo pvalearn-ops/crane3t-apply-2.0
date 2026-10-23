@@ -290,6 +290,7 @@ const PdfExport = (() => {
       try {
         await new Promise((res, rej) => { fr.onload = res; setTimeout(() => rej(new Error('頁面載入逾時')), 30000); });
         const win = fr.contentWindow, doc = fr.contentDocument;
+        if (!doc) throw new Error(location.protocol === 'file:' ? '以檔案方式（file://）開啟網頁時，瀏覽器禁止讀取子頁面；請改用網站網址或「啟動網頁.bat」開啟' : '無法讀取子頁面內容');
         await sleep(opt.wait || 700);
         // 示意圖等圖片載入完成再擷取（離屏 iframe 可能延後載入）
         await Promise.all(Array.from(doc.images).map(img => {
@@ -351,7 +352,7 @@ const PdfExport = (() => {
   async function build(c, files, opt, log) {
     const B = new Builder(log);
     await B.init();
-    const q = (k) => '?case=' + encodeURIComponent(c.id) + '&v=20261011k';   // 版本參數避免子頁面舊快取
+    const q = (k) => '?case=' + encodeURIComponent(c.id) + '&v=' + (typeof SUB_VER !== 'undefined' ? SUB_VER : Date.now());   // 版本參數避免子頁面舊快取（與主控台 SUB_VER 一致）
     const fileList = (slot) => files.filter(f => f.slot === slot || f.slot.startsWith(slot + '#')).sort((a, b) => a.slot.localeCompare(b.slot));
     const S = opt.sections;
     const attach = async (slot, label) => {
@@ -440,7 +441,8 @@ const PdfExport = (() => {
         log('擷取安定度計算書…');
         await B.captureFrame('安定度/安定度計算.html' + q(), {
           selector: '.page', width: 1100,
-          css: '.page{page-break-after:auto !important;} #a4Table input[type=number]{width:70px;} #a4Table tr:first-child th:last-child{display:none !important;}',
+          // 附件4 與列印版相同之緊縮樣式，確保整表塞進橫式 A4 寬度
+          css: '.page{page-break-after:auto !important;} #page-a4 .tbl-scroll{overflow:visible;} #a4Table{width:100%;font-size:11px;line-height:1.3;} #a4Table th,#a4Table td{padding:2px 3px;} #a4Table th{white-space:normal;} #a4Table input[type=number]{width:52px;font-size:11px;padding:0;} #a4Table tr:first-child th:last-child{display:none !important;} #a4Table tr.sec .secheader{font-size:12px;padding:3px 6px;}',
           landscapeIf: (el) => el.id === 'page-a4'
         });
       });

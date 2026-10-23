@@ -6,7 +6,7 @@
 <title>伸臂強度計算書</title>
 <script src="../shared/case-bridge.js?v=20261010y"></script>
 <script src="boom-geo.js?v=20261011f"></script>
-<script src="boom-db.js?v=20261011b"></script>
+<script src="boom-db.js?v=20261023e"></script>
 <style>
 :root{
   --ink:#1b2430; --muted:#5b6675; --line:#d5dbe3; --line2:#e8ecf1; --bg:#f3f5f8; --card:#fff;
@@ -224,7 +224,7 @@ body.preview #pvbar{display:flex;position:fixed;top:0;left:0;right:0;z-index:9;b
 </main>
 </div>
 <div id="pvbar"><b>A4 列印預覽</b><span class="sub">直式 A4，表 3～7 為橫式；實際分頁以瀏覽器列印為準</span><span style="flex:1"></span>
-  <label class="sub" style="opacity:1"><input type="checkbox" id="pvDetail" checked> 附各斷面控制條件計算明細</label>
+  <label class="sub" style="opacity:1"><input type="checkbox" id="pvDetail" checked> 附各斷面最不利性能計算明細</label>
   <button class="pri" id="pvPrint">列印</button><button id="pvClose" style="background:transparent;color:#fff">關閉預覽</button></div>
 <div id="print"></div>
 
@@ -299,6 +299,7 @@ function migrate(o) {
   S2.design = Object.assign(baseState().design, o.design || {});
   if (!(o.design && o.design.weldEff > 0)) S2.design.weldEff = o.src === 'self' ? SELF_DESIGN.weldEff : 1;
   if (o.src === 'self' && !(o.design && o.design.rOff > 0)) S2.design.rOff = SELF_DESIGN.rOff;   // 偏移預設 20 cm
+  if (o.src === 'self' && o.design && o.design.sigY === 4580) S2.design.sigY = SELF_DESIGN.sigY;   // 舊預設降伏應力 4580 → 4600
   S2.project = Object.assign(baseState().project, o.project || {});
   if (!S2.chart) S2.chart = { title: '吊升荷重表', radii: '' };
   if (o.src === undefined) { S2.src = null; S2.step = 1; }   // 舊版資料：回到 STEP 1
@@ -463,7 +464,7 @@ function effGeo() {
 }
 
 /* ---------------- 主計算 ---------------- */
-const weld = () => (S.design.weldEff > 0 ? S.design.weldEff : 1);   // 熔接效率 η
+const weld = () => (isDb() ? 1 : S.design.weldEff > 0 ? S.design.weldEff : 1);   // 熔接效率 η（原廠機型一律 1.0）
 /* 基本容許應力 σa₀（原廠機型與自行計算一律相同）：依移動式起重機安全檢查構造標準第 5 條
    （同日本移動式クレーン構造規格第 3 條）：σa = min(降伏強度 σy ÷ 1.5, 抗拉強度 σB ÷ 1.8)；σca = σa ÷ 1.15 */
 const C_DIV = 1.15;
@@ -478,12 +479,13 @@ const sigA0 = () => {
 /* 容許應力計算過程（計算書與畫面共用）：每列 [項目, 算式與結果] */
 function allowRows() {
   const d = S.design, k = d.kA, eta = weld(), p = sigA0Parts();
-  const mul = `× ${k}${eta !== 1 ? ' × ' + eta : ''}`, rows = [];
+  const etaS = Math.round(eta * 100) % 10 ? eta.toFixed(2) : eta.toFixed(1);   // 1 → 1.0、0.8 → 0.8
+  const mul = `× ${k} × ${etaS}`, rows = [];
   rows.push(['基本容許應力 σa₀', `min(σy ÷ 1.5, σB ÷ 1.8) = min(${f(d.sigY, 0)} ÷ 1.5, ${f(d.sigB, 0)} ÷ 1.8) = min(${f(p.y, 0)}, ${f(p.b, 0)}) = ${f(sigA0(), 0)} kgf/cm²`]);
   rows.push(['容許應力增加係數 k', `${k}（含風荷重之荷重組合）`]);
-  if (eta !== 1) rows.push(['熔接效率 η', `${eta}`]);
-  rows.push([`容許拉應力 σa = σa₀ × k${eta !== 1 ? ' × η' : ''}`, `${f(sigA0(), 0)} ${mul} = ${f(sigA(), 0)} kgf/cm²`]);
-  rows.push([`容許壓應力 σca = σa₀ ÷ ${C_DIV} × k${eta !== 1 ? ' × η' : ''}`, `${f(sigA0(), 0)} ÷ ${C_DIV} ${mul} = ${f(sigAc(), 0)} kgf/cm²`]);
+  rows.push(['熔接效率 η', `${etaS}${isDb() ? '' : eta === 1 ? '（焊道經非破壞檢測）' : '（焊道未經非破壞檢測）'}`]);
+  rows.push(['容許拉應力 σa = σa₀ × k × η', `${f(sigA0(), 0)} ${mul} = ${f(sigA(), 0)} kgf/cm²`]);
+  rows.push([`容許壓應力 σca = σa₀ ÷ ${C_DIV} × k × η`, `${f(sigA0(), 0)} ÷ ${C_DIV} ${mul} = ${f(sigAc(), 0)} kgf/cm²`]);
   return rows;
 }
 const sigA = () => sigA0() * S.design.kA * weld();
@@ -498,7 +500,6 @@ function thetaOf(st, row) {
   }
   return row[2];
 }
-function boomG(items, k) { return items.reduce((s, it) => s + ((it.kind ? it.kind === 'boom' : true) && Number(it.boom) === k + 1 && isNum(it.G) ? it.G : 0), 0); }
 
 function windOf(T, k, geo) {
   if (!T[k].active) return null;
@@ -522,48 +523,43 @@ function wOf(k, g) {
   if (isDb()) return S.booms[k].w;
   return g && !g.err ? Math.round(g.A * STEEL * 1000) / 1000 : NaN;
 }
+/* 各斷面與荷重無關之計算用值（只隨伸臂長度變化；計算與計算書表 3 共用）
+   SG = Σℓi·Gi、Dw = ½·w·ℓ₀²；軸力用 ΣG = ΣGi + w·ℓ₀；挫屈長度 ℓ：至外側下一節臨界斷面（最前端節至滑輪銷） */
+function secConst(T, k, sg, items) {
+  const g = T[k];
+  let SG = 0, Gi = 0; const terms = [];
+  items.forEach((it, i) => { const l = g.li[i]; if (isNum(l) && isNum(it.G)) { SG += l * it.G; Gi += it.G; terms.push([i, l, it.G]); } });
+  const l0 = isNum(g.l0) ? g.l0 : 0;
+  const w = wOf(k, sg), wv = isNum(w) ? w : 0, Dw = 0.5 * wv * l0 * l0, Gw = wv * l0, G = Gi + Gw;
+  let nx = null; for (let j = k + 1; j < S.booms.length; j++) if (T[j].active) { nx = j; break; }
+  const lb = nx != null ? g.L - T[nx].L : g.L;
+  const lam = 2 * lb / sg.ky, om = isNum(lam) ? omegaOf(lam) : NaN;
+  return { SG, terms, l0, w, Dw, Gi, Gw, G, nx, lb, lam, om };
+}
 /* 單一荷重點（額定荷重 W、伸臂角 th）各斷面之應力 */
 function rowCalc(T, wind, geo, items, W, th) {
-  const d = S.design, N = S.booms.length;
+  const d = S.design;
   const c = Math.cos(th * RAD), sn = Math.sin(th * RAD);
-      let ax = null;
-      const t = N - 1;
-      if (d.axial === 'wire' && N >= 4 && T[t].active && isNum(W) && isNum(th)) {
-        const Gt = boomG(items, t), G1 = boomG(items, t - 1), G2 = boomG(items, t - 2);
-        const Nt = (d.psi1 * W + d.psi2 * Gt) * sn + d.psi1 * W / d.nRope;
-        const N1 = 2 * Nt + d.psi2 * G1 * sn;
-        const N2 = 2 * N1 - Nt + d.psi2 * G2 * sn;
-        ax = { [t]: { N: Nt, comp: true, lb: T[t].L, G: Gt },
-               [t - 1]: { N: N1, comp: true, lb: T[t - 1].active ? T[t - 1].L - T[t].L : NaN, G: G1 },
-               [t - 2]: { N: N2, comp: true, lb: T[t - 2].active && T[t - 1].active ? T[t - 2].L - T[t - 1].L : NaN, G: G2 },
-               [t - 3]: { N: N1, comp: false } };
-      }
+  const nR = d.nRope > 0 ? d.nRope : 1;
       const secs = S.booms.map((bm, k) => {
         const g = T[k], sg = geo[k];
         if (!g.active || sg.err || !isNum(W) || !isNum(th)) return { k, active: g.active, bad: g.active };
-        let SG = 0; const terms = [];
-        items.forEach((it, i) => { const l = g.li[i]; if (isNum(l) && isNum(it.G)) { SG += l * it.G; terms.push([i, l, it.G]); } });
-        const l0 = isNum(g.l0) ? g.l0 : 0;
-        const w = wOf(k, sg), Dw = 0.5 * (isNum(w) ? w : 0) * l0 * l0;
+        const K = secConst(T, k, sg, items), { SG, terms, l0, w, Dw } = K;
         const Mx = (d.psi1 * W * g.L + d.psi2 * (SG + Dw)) * c;
         const s1 = Mx / sg.Zx1, s1c = Mx / sg.Zx2;
         const My = d.phi * (W * g.L + SG + Dw) * c;
         const s3 = My / sg.Zy;
         const wd = wind[k]; const s4 = wd ? wd.M / sg.Zy : 0;
-        let s2 = null, s2c = null, axd = null;
-        if (ax && ax[k]) {
-          const a = ax[k];
-          if (a.comp) {
-            const lam = 2 * a.lb / sg.ky, om = isNum(lam) ? omegaOf(lam) : NaN;
-            s2 = -a.N / sg.A; s2c = om * a.N / sg.A; axd = { ...a, lam, om };
-          } else { s2 = a.N / sg.A; s2c = -a.N / sg.A; axd = { ...a }; }
-        }
+        // 軸力（通用，不分伸縮方式及油壓缸支數）：N = (ψ₁·W + ψ₂·ΣG)·sin θ + ψ₁·W / n_R
+        const Nax = (d.psi1 * W + d.psi2 * K.G) * sn + d.psi1 * W / nR;
+        const s2 = -Nax / sg.A, s2c = K.om * Nax / sg.A;
+        const axd = { N: Nax, Gi: K.Gi, Gw: K.Gw, G: K.G, lb: K.lb, lam: K.lam, om: K.om, nx: K.nx };
         const R = { s1: rv(s1), s1c: rv(s1c), s2: s2 == null ? null : rv(s2), s2c: s2c == null ? null : rv(s2c), s3: rv(s3), s4: rv(s4) };
         const st_ = R.s1 + (R.s2 || 0) + R.s3 + R.s4;
         const sc_ = R.s1c + (R.s2c || 0) + R.s3 + R.s4;
         return { k, active: true, SG, terms, l0, L: g.L, w, Dw, Mx, s1, s1c, My, s3, wind: wd, s4, s2, s2c, axd, R, st: st_, sc: sc_ };
       });
-  return { W, th, c, sn, secs, ax };
+  return { W, th, c, sn, secs };
 }
 /* 應力比 = max(σt/σa, σc/σca, σt/疲勞限)；有斷面無法計算時為 ∞ */
 function rowU(secs) {
@@ -782,15 +778,15 @@ function renderDesign() {
     <div class="f"><label>基本容許應力 σa₀ = min(σy ÷ 1.5, σB ÷ 1.8)</label><span class="calc" id="sA0val"></span><span class="u">kgf/cm²</span></div>
     ${fld('容許應力增加係數（含風荷重組合）', 'design.kA', '')}
     ${fld('彈性係數 E', 'design.E', 'kgf/cm²')}
-    ${fld('熔接效率 η（有非破壞檢測可取 1.0）', 'design.weldEff', '')}
+    ${fld(isDb() ? '熔接效率 η（原廠機型固定以 1.0 計算）' : '熔接效率 η（有非破壞檢測可取 1.0）', 'design.weldEff', '')}
     <div class="f"><label>容許拉應力 σa = σa₀ × 係數 × η</label><span class="calc" id="sAval"></span><span class="u">kgf/cm²</span></div>
     <div class="f"><label>容許壓應力 σca = σa₀ ÷ 1.15 × 係數 × η</label><span class="calc" id="sAcval"></span><span class="u">kgf/cm²</span></div>
   </div>
-  <p class="note">移動式起重機安全檢查構造標準第 5 條（同日本移動式クレーン構造規格第 3 條）：基本容許應力 σa₀ = min(σy ÷ 1.5, σB ÷ 1.8)，σca = σa / 1.15；原廠機型與自行計算一律依此由材料值自動計算（不採原廠計算書之容許應力）。例：σa₀ 300 → 拉 300 × 1.15 = 345 N/mm²、壓 300 / 1.15 × 1.15 = 300 N/mm²。合成應力 σt 與 σa 比較、σc 與 σca 比較。<br>自行計算之材料值依台灣法規認可：抗拉強度 6000、降伏應力 4580、彈性係數 2,100,000 kgf/cm²；熔接效率 η 預帶 0.8，焊道經非破壞檢測者可取 1.0（原廠資料取 1.0）。<br>單位換算：1 N/mm² = 10.197 kgf/cm²（例 345 N/mm² ≈ 3518 kgf/cm²）。</p></div>
+  <p class="note">移動式起重機安全檢查構造標準第 5 條：基本容許應力 σa₀ = min(σy ÷ 1.5, σB ÷ 1.8)，σca = σa / 1.15；原廠機型與自行計算一律依此由材料值自動計算（不採原廠計算書之容許應力）。例：σa₀ 300 → 拉 300 × 1.15 = 345 N/mm²、壓 300 / 1.15 × 1.15 = 300 N/mm²。合成應力 σt 與 σa 比較、σc 與 σca 比較。<br>自行計算之材料值依台灣法規認可：抗拉強度 6000、降伏應力 4600、彈性係數 2,100,000 kgf/cm²；熔接效率 η 預帶 0.8，焊道經非破壞檢測者可取 1.0（原廠資料取 1.0）。<br>單位換算：1 N/mm² = 10.197 kgf/cm²（例 345 N/mm² ≈ 3518 kgf/cm²）。</p></div>
   <div class="card"><h3 style="margin-top:0">荷重係數</h3><div class="grid">
     ${fld('動荷重係數 ψ₁', 'design.psi1')}
     ${fld('靜荷重係數 ψ₂', 'design.psi2')}
-    ${fld('水平荷重係數 φ', 'design.phi')}
+    ${fld('水平荷重係數 β', 'design.phi')}
     ${fld('風力係數 C', 'design.C')}
   </div></div>
   <div class="card"><h3 style="margin-top:0">風荷重</h3><div class="grid">
@@ -801,12 +797,9 @@ function renderDesign() {
   </div>
   <p class="note">各節伸臂側面受風面積 = 外露長度 × 斷面高 H，由第 4 頁之 L、ℓ₀ 自動計算；受風中心取外露段中點。頭部（滑輪、吊鉤）若需另計，請填附加面積，作用於滑輪銷位置。</p></div>
   <div class="card"><h3 style="margin-top:0">軸力（伸縮機構）</h3><div class="grid">
-    <div class="f"><label>軸力計算方式</label><select data-k="design.axial" data-t="sel" data-struct="1">
-      <option value="wire" ${d.axial === 'wire' ? 'selected' : ''}>鋼索同步伸縮（原計算書式 (4)~(7)）</option>
-      <option value="none" ${d.axial === 'none' ? 'selected' : ''}>不計軸力（全油壓缸伸縮）</option></select></div>
-    ${fld('吊索掛數 n', 'design.nRope', '掛')}
+    ${fld('吊索掛數 n<sub>R</sub>', 'design.nRope', '掛')}
   </div>
-  <p class="note">鋼索同步伸縮：最末節及其前兩節承受壓縮軸力（計入挫屈係數 ω），再前一節承受拉力 N = N(末節−1)。須伸臂節數 ≥ 4，且最末節伸出時才計算。</p></div>
+  <p class="note">軸力（通用算法）：各節臨界斷面均計入軸向壓力 N = (ψ₁·W + ψ₂·ΣG)·sin θ + ψ₁·W / n<sub>R</sub>，壓側計入挫屈係數 ω；不分伸縮方式及油壓缸支數。</p></div>
   <div class="card"><h3 style="margin-top:0">挫屈係數 ω</h3><div class="grid">
     <div class="f"><label>ω 取值方式</label><select data-k="design.omegaMode" data-t="sel" data-struct="1">
       <option value="formula" ${d.omegaMode !== 'table' && d.omegaMode !== 'code' ? 'selected' : ''}>公式計算</option>
@@ -1079,13 +1072,13 @@ function resultTable(C, title, sub, cell, print, only) {
 const c2 = (v, ng) => `<td class="n ${ng ? 'ng' : ''}">${v == null ? '' : fs(v)}</td>`;
 const naC = '<td class="na"></td>';
 const TABLES = [
-  ['表 3　垂直荷重所生彎曲應力（σ₁ 拉側、σ₁′ 壓側）', ['σ₁', 'σ₁′'], sc => c2(sc.R.s1) + c2(sc.R.s1c)],
-  ['表 4　軸力所生應力（σ₂ 拉側、σ₂′ 壓側）', ['σ₂', 'σ₂′'], sc => sc.R.s2 == null ? naC + naC : c2(sc.R.s2) + c2(sc.R.s2c), 'axial'],
-  ['表 5　水平荷重所生彎曲應力 σ₃', ['σ₃'], sc => c2(sc.R.s3)],
-  ['表 6　風荷重所生彎曲應力 σ₄', ['σ₄'], sc => c2(sc.R.s4)],
-  ['表 7　合成應力（σt 拉側、σc 壓側）', ['σt', 'σc'], sc => c2(sc.st, sc.st > sigA()) + c2(sc.sc, sc.sc > sigAc())]
+  ['表 5　垂直荷重所生彎曲應力（σ₁ 拉側、σ₁′ 壓側）', ['σ₁', 'σ₁′'], sc => c2(sc.R.s1) + c2(sc.R.s1c)],
+  ['表 6　軸力所生應力（σ₂ 拉側、σ₂′ 壓側）', ['σ₂', 'σ₂′'], sc => sc.R.s2 == null ? naC + naC : c2(sc.R.s2) + c2(sc.R.s2c), 'axial'],
+  ['表 7　水平荷重所生彎曲應力 σ₃', ['σ₃'], sc => c2(sc.R.s3)],
+  ['表 8　風荷重所生彎曲應力 σ₄', ['σ₄'], sc => c2(sc.R.s4)],
+  ['表 9　合成應力（σt 拉側、σc 壓側）', ['σt', 'σc'], sc => c2(sc.st, sc.st > sigA()) + c2(sc.sc, sc.sc > sigAc())]
 ];
-const tblOn = cond => cond === 'axial' ? S.design.axial === 'wire' : true;
+const tblOn = () => true;
 /* 疲勞檢核摘要 */
 function extraSummary(C, print) {
   const d = S.design; let h = '';
@@ -1111,7 +1104,7 @@ function renderResults(C) {
   const sa = sigA();
   let h = `<h2>⑤ 計算結果</h2>
   <div class="verdict ${C.ok ? 'ok' : 'ng'}">${C.ok ? '✔ 各項應力均未超過容許值' : '✘ 有應力超過容許值或輸入有誤'}
-    <span style="font-weight:400;font-size:14px">容許應力 拉 σa = ${f(sigA0(), 0)} × ${S.design.kA}${weld() !== 1 ? ' × ' + weld() : ''} = <b>${f(sa, 0)}</b>、壓 σca = <b>${f(sigAc(), 0)}</b> kgf/cm²　最大應力比 ${f(C.maxU, 3)}　重心資料：${C.eff.mode === 'est' ? '自行計算推算' : '原廠資料'}</span></div>
+    <span style="font-weight:400;font-size:14px">容許應力 拉 σa = ${f(sigA0(), 0)} × ${S.design.kA} × η ${weld()} = <b>${f(sa, 0)}</b>、壓 σca = <b>${f(sigAc(), 0)}</b> kgf/cm²　最大應力比 ${f(C.maxU, 3)}　重心資料：${C.eff.mode === 'est' ? '自行計算推算' : '原廠資料'}</span></div>
   ${C.errs.length ? `<div class="card err">${C.errs.join('<br>')}</div>` : ''}
   <h3>各斷面最大應力</h3><div class="card"><div class="tbl">${summaryTable(C)}</div><p class="note">應力單位 kgf/cm²。應力比 = max(σt / σa, σc / σca)。</p></div>
   ${C.fat ? `<div class="card"><div class="tbl">${extraSummary(C)}</div></div>` : ''}`;
@@ -1130,7 +1123,7 @@ function renderDetailShell() {
     <label>伸臂長 <select id="dS">${S.stages.map((st, s) => `<option value="${s}" ${u.s === s ? 'selected' : ''}>${f(st.len, 2)} m</option>`).join('')}</select></label>
     <label>荷重點 <select id="dR">${S.stages[u.s].rows.map((r, i) => `<option value="${i}" ${u.r === i ? 'selected' : ''}>${f(r[0], 0)} kgf／R ${f(r[1], 3)} m</option>`).join('')}</select></label>
     <label>斷面 <select id="dK">${S.booms.map((_, k) => `<option value="${k}" ${u.k === k ? 'selected' : ''}>${secName(k)}</option>`).join('')}</select></label>
-    <button class="sm" data-act="govern">跳至此斷面控制條件</button>
+    <button class="sm" data-act="govern">跳至此斷面最不利條件</button>
   </div><div class="card formula" id="detail"></div>`;
 }
 function detailHTML(C, s, r, k) {
@@ -1155,34 +1148,78 @@ function detailHTML(C, s, r, k) {
   <div class="eq">σ₁ = M<sub>x</sub> / Z<sub>x1</sub> = ${f(sc.Mx, 0)} / ${f(g.Zx1, 2)} = ${f(sc.s1, 2)} → <span class="r">${fs(sc.R.s1)}</span> kgf/cm²（拉側）…(1)</div>
   <div class="eq">σ₁′ = M<sub>x</sub> / Z<sub>x2</sub> = ${f(sc.Mx, 0)} / ${f(g.Zx2, 2)} = ${f(sc.s1c, 2)} → <span class="r">${fs(sc.R.s1c)}</span> kgf/cm²（壓側）…(2)</div>`;
   h += `<h4>2-2 軸力所生應力</h4>`;
-  if (row.ax && sc.axd) {
-    const t = S.booms.length - 1, a = row.ax;
-    h += `<div class="eq">最末節 ${boomName(t)}：N = (ψ₁·W + ψ₂·G)·sin θ + ψ₁·W/n = (${d.psi1}×${f(row.W, 0)} + ${d.psi2}×${f(a[t].G, 0)})×${f(row.sn, 5)} + ${d.psi1}×${f(row.W, 0)}/${d.nRope} = <span class="r">${f(a[t].N, 1)}</span> kgf　…(7)</div>
-    <div class="eq">${boomName(t - 1)}：N = 2·N${t + 1} + ψ₂·G·sin θ = 2×${f(a[t].N, 1)} + ${d.psi2}×${f(a[t - 1].G, 0)}×${f(row.sn, 5)} = <span class="r">${f(a[t - 1].N, 1)}</span> kgf　…(6)</div>
-    <div class="eq">${boomName(t - 2)}：N = 2·N${t} − N${t + 1} + ψ₂·G·sin θ = 2×${f(a[t - 1].N, 1)} − ${f(a[t].N, 1)} + ${d.psi2}×${f(a[t - 2].G, 0)}×${f(row.sn, 5)} = <span class="r">${f(a[t - 2].N, 1)}</span> kgf　…(5)</div>
-    <div class="eq">${boomName(t - 3)}（拉力）：N = N${t} = <span class="r">${f(a[t - 3].N, 1)}</span> kgf　…(4)</div>`;
+  if (sc.axd) {
     const x = sc.axd;
-    if (x.comp) h += `<div class="eq">本斷面（壓縮）：λ = 2ℓ / k<sub>y</sub> = 2 × ${f(x.lb, 1)} / ${f(g.ky, 2)} = ${f(x.lam, 2)}，ω = <span class="r">${f(x.om, 3)}</span></div>
-      <div class="eq">σ₂ = −N / A = −${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2)}</span>　σ₂′ = ω·N / A = ${f(x.om, 3)} × ${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2c)}</span> kgf/cm²</div>`;
-    else h += `<div class="eq">本斷面（拉伸）：σ₂ = N / A = ${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2)}</span>　σ₂′ = −N / A = <span class="r">${fs(sc.R.s2c)}</span> kgf/cm²</div>`;
-  } else h += `<div class="eq note">本斷面於此條件不計軸力。</div>`;
+    h += `<div class="eq">ΣG = ΣGi + w·ℓ₀ = ${f(x.Gi, 0)} + ${f(sc.w, 3)} × ${f(sc.l0, 1)} = ${f(x.G, 1)} kgf</div>
+    <div class="eq">N = (ψ₁·W + ψ₂·ΣG)·sin θ + ψ₁·W / n<sub>R</sub> = (${d.psi1} × ${f(row.W, 0)} + ${d.psi2} × ${f(x.G, 1)}) × ${f(row.sn, 5)} + ${d.psi1} × ${f(row.W, 0)} / ${d.nRope} = <span class="r">${f(x.N, 1)}</span> kgf　…(4)</div>
+    <div class="eq">ℓ = ${x.nx != null ? `L − L<sub>${boomName(x.nx)}</sub> = ${f(sc.L, 1)} − ${f(sc.L - x.lb, 1)} = ${f(x.lb, 1)}` : `L = ${f(x.lb, 1)}`} cm，λ = 2ℓ / k<sub>y</sub> = 2 × ${f(x.lb, 1)} / ${f(g.ky, 2)} = ${f(x.lam, 2)}，ω = <span class="r">${f(x.om, 3)}</span></div>
+    <div class="eq">σ₂ = −N / A = −${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2)}</span>　σ₂′ = ω·N / A = ${f(x.om, 3)} × ${f(x.N, 1)} / ${f(g.A, 2)} = <span class="r">${fs(sc.R.s2c)}</span> kgf/cm²　…(5)</div>`;
+  }
   h += `<h4>2-3 水平荷重所生彎曲應力</h4>
-  <div class="eq">M<sub>y</sub> = φ(W·L + ΣGi·ℓi + ½·w·ℓ₀²) cos θ = ${d.phi} × (${f(row.W, 0)} × ${f(sc.L, 1)} + ${f(sc.SG, 1)} + ${f(sc.Dw, 1)}) × ${f(row.c, 5)} = <span class="r">${f(sc.My, 0)}</span> kgf·cm　…(20)</div>
-  <div class="eq">σ₃ = M<sub>y</sub> / Z<sub>y</sub> = ${f(sc.My, 0)} / ${f(g.Zy, 2)} = ${f(sc.s3, 2)} → <span class="r">${fs(sc.R.s3)}</span> kgf/cm²　…(19)</div>
+  <div class="eq">M<sub>y</sub> = β(W·L + ΣGi·ℓi + ½·w·ℓ₀²) cos θ = ${d.phi} × (${f(row.W, 0)} × ${f(sc.L, 1)} + ${f(sc.SG, 1)} + ${f(sc.Dw, 1)}) × ${f(row.c, 5)} = <span class="r">${f(sc.My, 0)}</span> kgf·cm　…(7)</div>
+  <div class="eq">σ₃ = M<sub>y</sub> / Z<sub>y</sub> = ${f(sc.My, 0)} / ${f(g.Zy, 2)} = ${f(sc.s3, 2)} → <span class="r">${fs(sc.R.s3)}</span> kgf/cm²　…(6)</div>
   <h4>2-4 風荷重所生彎曲應力</h4>
-  <div class="eq">q = ${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(sc.wind.q, 2)} kgf/m²，Wg = q·C·A = ${f(sc.wind.q, 2)} × ${d.C} × A　…(23)</div>
-  <div class="eq"><table><thead><tr><th>受風段</th><th>外露長 (cm)</th><th>高 H (cm)</th><th>面積 A (m²)</th><th>Wg (kgf)</th><th>ℓi (cm)</th><th>Wg·ℓi (kgf·cm)</th></tr></thead><tbody>
+  <div class="eq">q = ${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(sc.wind.q, 2)} kgf/m²，Wgi = q·C·Awi = ${f(sc.wind.q, 2)} × ${d.C} × Awi　…(10)</div>
+  <div class="eq"><table><thead><tr><th>受風段</th><th>外露長 (cm)</th><th>高 H (cm)</th><th>面積 Awi (m²)</th><th>Wgi (kgf)</th><th>ℓwi (cm)</th><th>Wgi·ℓwi (kgf·cm)</th></tr></thead><tbody>
   ${sc.wind.segs.map(x => `<tr><td>${x.j < 0 ? '頭部附加' : boomName(x.j)}</td><td class="n">${x.j < 0 ? '' : f(x.len, 1)}</td><td class="n">${x.j < 0 ? '' : f(x.H, 2)}</td><td class="n">${f(x.Am, 4)}</td><td class="n">${f(x.Wg, 2)}</td><td class="n">${f(x.arm, 1)}</td><td class="n">${f(x.M, 0)}</td></tr>`).join('')}
   </tbody></table></div>
-  <div class="eq">M<sub>w</sub> = ΣWgi·ℓi = <span class="r">${f(sc.wind.M, 0)}</span> kgf·cm　…(22)　σ₄ = M<sub>w</sub> / Z<sub>y</sub> = ${f(sc.wind.M, 0)} / ${f(g.Zy, 2)} = ${f(sc.s4, 2)} → <span class="r">${fs(sc.R.s4)}</span> kgf/cm²　…(21)</div>
+  <div class="eq">M<sub>w</sub> = ΣWgi·ℓwi = <span class="r">${f(sc.wind.M, 0)}</span> kgf·cm　…(9)　σ₄ = M<sub>w</sub> / Z<sub>y</sub> = ${f(sc.wind.M, 0)} / ${f(g.Zy, 2)} = ${f(sc.s4, 2)} → <span class="r">${fs(sc.R.s4)}</span> kgf/cm²　…(8)</div>
   <h4>2-5 合成應力</h4>
-  <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄ = ${fs(sc.R.s1)} + (${fs(sc.R.s2 || 0)}) + ${fs(sc.R.s3)} + ${fs(sc.R.s4)} = <span class="r">${fs(sc.st)}</span> kgf/cm² ${sc.st <= sa ? '≤' : '>'} ${f(sa, 0)}　<span class="badge ${sc.st <= sa ? 'ok' : 'ng'}">${sc.st <= sa ? 'OK' : 'NG'}</span>　…(24)</div>
-  <div class="eq">σc = σ₁′ + σ₂′ + σ₃ + σ₄ = ${fs(sc.R.s1c)} + (${fs(sc.R.s2c || 0)}) + ${fs(sc.R.s3)} + ${fs(sc.R.s4)} = <span class="r">${fs(sc.sc)}</span> kgf/cm² ${sc.sc <= sac ? '≤' : '>'} ${f(sac, 0)}　<span class="badge ${sc.sc <= sac ? 'ok' : 'ng'}">${sc.sc <= sac ? 'OK' : 'NG'}</span>　…(25)</div>`;
+  <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄ = ${fs(sc.R.s1)} + (${fs(sc.R.s2 || 0)}) + ${fs(sc.R.s3)} + ${fs(sc.R.s4)} = <span class="r">${fs(sc.st)}</span> kgf/cm² ${sc.st <= sa ? '≤' : '>'} ${f(sa, 0)}　<span class="badge ${sc.st <= sa ? 'ok' : 'ng'}">${sc.st <= sa ? 'OK' : 'NG'}</span>　…(11)</div>
+  <div class="eq">σc = σ₁′ + σ₂′ + σ₃ + σ₄ = ${fs(sc.R.s1c)} + (${fs(sc.R.s2c || 0)}) + ${fs(sc.R.s3)} + ${fs(sc.R.s4)} = <span class="r">${fs(sc.sc)}</span> kgf/cm² ${sc.sc <= sac ? '≤' : '>'} ${f(sac, 0)}　<span class="badge ${sc.sc <= sac ? 'ok' : 'ng'}">${sc.sc <= sac ? 'OK' : 'NG'}</span>　…(12)</div>`;
   return h;
 }
 
 /* ---------------- A4 列印版 ---------------- */
 const PRINT_SCALES = [1, 2, 2.5, 4, 5, 10, 20, 25, 50];
+/* 表 3：各斷面彎矩與軸力之計算用值（與荷重無關，供讀者以表 4～表 9 之 W、θ 自行驗算） */
+function constTableHTML(C) {
+  const items = C.eff.items;
+  let o = `<h3>表 3　各斷面彎矩與軸力之計算用值</h3>
+    <p class="note">Σℓi·Gi、½·w·ℓ₀² 代入式 (3)、(7)；ΣG = ΣGi + w·ℓ₀ 代入式 (4)；ℓ：挫屈長度（最前端節至滑輪銷，其餘至外側下一節臨界斷面），λ = 2ℓ / k<sub>y</sub>，ω 由 λ 求得，代入式 (5)。L、ℓ₀、ℓi 見表 2，Gi、w 見各部重量表，k<sub>y</sub>、A 見表 1。</p>`;
+  const head = `<thead><tr><th>伸臂長</th><th>項目</th>${S.booms.map((_, k) => `<th>${secName(k)}</th>`).join('')}</tr></thead>`;
+  const rowsDef = [
+    ['Σℓi·Gi (kgf·cm)', K => f(K.SG, 0)], ['½·w·ℓ₀² (kgf·cm)', K => f(K.Dw, 0)],
+    ['ΣGi (kgf)', K => f(K.Gi, 0)], ['w·ℓ₀ (kgf)', K => f(K.Gw, 1)], ['ΣG (kgf)', K => f(K.G, 1)],
+    ['挫屈長度 ℓ (cm)', K => f(K.lb, 1)], ['λ = 2ℓ / k<sub>y</sub>', K => f(K.lam, 2)], ['ω', K => f(K.om, 3)]];
+  S.stages.forEach((st, s) => {
+    const T = C.eff.tables[s];
+    const Ks = S.booms.map((_, k) => T[k].active && !C.geo[k].err ? secConst(T, k, C.geo[k], items) : null);
+    o += `<div class="blk"><table>${head}<tbody>`;
+    rowsDef.forEach(([lab, fn], j) => {
+      o += `<tr>${j === 0 ? `<td rowspan="${rowsDef.length}" class="grp">${f(st.len, 2)} m</td>` : ''}<td>${lab}</td>${Ks.map(K => K ? `<td class="n">${fn(K)}</td>` : '<td class="na"></td>').join('')}</tr>`;
+    });
+    o += `</tbody></table></div>`;
+  });
+  return o;
+}
+/* 表 4：各伸臂長度、各臨界斷面之風荷重 Wgi 與受風中心距離 ℓwi（與荷重無關，只隨伸臂長度變化） */
+function windTableHTML(C) {
+  const d = S.design;
+  let o = `<h3>表 4　風荷重 Wgi 與受風中心距離 ℓwi</h3>
+    <p class="note">速度壓 q = ${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(qWind(), 2)} kgf/m²，風力係數 C = ${d.C}；Wgi = q·C·Awi（Awi = 外露長度 × 伸臂高度）；ℓwi 為自臨界斷面至該段受風中心（外露段中點）之距離；M<sub>w</sub> = ΣWgi·ℓwi。</p>`;
+  const head = `<thead><tr><th>伸臂長</th><th>受風段</th><th>項目</th>${S.booms.map((_, k) => `<th>${secName(k)}</th>`).join('')}</tr></thead>`;
+  S.stages.forEach((st, s) => {
+    const wind = C.res[s] && C.res[s].wind; if (!wind) return;
+    // 受風段：伸臂各節（j）及頭部附加面積（j = −1）
+    const segIds = [];
+    wind.forEach(w => w && w.segs.forEach(x => { if (!segIds.includes(x.j)) segIds.push(x.j); }));
+    segIds.sort((a, b) => (a < 0 ? 99 : a) - (b < 0 ? 99 : b));
+    const nRow = segIds.length * 2 + 1;
+    o += `<div class="blk"><table>${head}<tbody>`;
+    segIds.forEach((j, i) => {
+      const seg = k => wind[k] && wind[k].segs.find(x => x.j === j);
+      // 受風面積（外露長 × 高 H = Awi）：同一受風段於各斷面相同，取任一斷面之值標示
+      let any = null; for (let k = 0; k < wind.length && !any; k++) any = seg(k);
+      const name = (j < 0 ? '頭部附加' : boomName(j)) + (any ? (j < 0 ? `<br><small>Awi = ${f(any.Am, 4)} m²</small>` : `<br><small>${f(any.len, 1)} × ${f(any.H, 2)} cm<br>Awi = ${f(any.Am, 4)} m²</small>`) : '');
+      o += `<tr>${i === 0 ? `<td rowspan="${nRow}" class="grp">${f(st.len, 2)} m</td>` : ''}<td rowspan="2">${name}</td><td>Wgi (kgf)</td>${S.booms.map((_, k) => !wind[k] ? '<td class="na"></td>' : seg(k) ? `<td class="n">${f(seg(k).Wg, 2)}</td>` : '<td class="n">—</td>').join('')}</tr>
+        <tr><td>ℓwi (cm)</td>${S.booms.map((_, k) => !wind[k] ? '<td class="na"></td>' : seg(k) ? `<td class="n">${f(seg(k).arm, 1)}</td>` : '<td class="n">—</td>').join('')}</tr>`;
+    });
+    o += `<tr><td colspan="2">M<sub>w</sub> (kgf·cm)</td>${S.booms.map((_, k) => wind[k] ? `<td class="n">${f(wind[k].M, 0)}</td>` : '<td class="na"></td>').join('')}</tr>`;
+    o += `</tbody></table></div>`;
+  });
+  return o;
+}
 function buildPrint() {
   const C = compute(), d = S.design, P = S.project, N = S.booms.length, sa = sigA();
   const ph = (t) => `<div class="ph"><span>${esc(P.title)}　MODEL：${esc(P.model)}</span><span>${t}</span></div>`;
@@ -1193,15 +1230,16 @@ function buildPrint() {
     <div class="t2" style="margin-top:18mm">${esc(P.title)}</div><div class="t2">MODEL：${esc(P.model)}</div>
     <div class="t2" style="font-size:10.5pt;margin-top:20mm">日期：${esc(P.date)}</div></div>
     <h2>目錄</h2><div class="kv"><span>1. 計算標準與結果</span><span></span><span>2. 伸臂強度計算方法</span><span></span><span>3. 臨界斷面形狀與斷面性質</span><span>圖 1、表 1</span>
-    <span>4. 重量與重心位置</span><span>表 2</span><span>5. 應力計算結果</span><span>表 3 ~ 表 7</span>${$('#pvDetail').checked ? '<span>6. 控制條件計算明細</span><span></span>' : ''}<span>附錄　吊升荷重表</span><span>最後一頁</span></div></div>`;
+    <span>4. 重量與重心位置</span><span>表 2 ~ 表 4</span><span>5. 應力計算結果</span><span>表 5 ~ 表 9</span>${$('#pvDetail').checked ? '<span>6. 各斷面最不利性能計算明細</span><span></span>' : ''}<span>附錄　吊升荷重表</span><span>最後一頁</span></div></div>`;
   // --- 1 計算標準與結果 ---
   const maxW = Math.max(...S.stages.flatMap(st => st.rows.map(r => r[0])).filter(isNum));
   o += `<div class="sheet">${ph('1. 計算標準與結果')}
     <h2>1. 計算標準與結果（Strength Calculation Standards and Results）</h2>
-    <p>本計算書依移動式起重機安全檢查構造標準及 JIS B 8821 起重機鋼構造部分計算基準，驗算各節伸臂臨界斷面之應力不超過容許應力。</p>
+    <p>本計算書依移動式起重機安全檢查構造標準，驗算各節伸臂臨界斷面之應力不超過容許應力。</p>
     <div class="kv"><span>最大額定荷重</span><span>${f(maxW, 0)} kgf</span><span>動荷重係數 ψ₁</span><span>${d.psi1}</span><span>靜荷重係數 ψ₂</span><span>${d.psi2}</span>
-    <span>水平荷重係數 φ</span><span>${d.phi}</span><span>風力係數 C</span><span>${d.C}</span><span>速度壓 q</span><span>${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(qWind(), 2)} kgf/m²</span>
-    <span>吊索掛數 n</span><span>${d.nRope}</span><span>軸力</span><span>${d.axial === 'wire' ? '鋼索同步伸縮（式 4~7）' : '不計'}</span>
+    <span>水平荷重係數 β</span><span>${d.phi}</span><span>風力係數 C</span><span>${d.C}</span><span>速度壓 q</span><span>${d.qk} × ⁴√${Math.max(d.h, 16)} = ${f(qWind(), 2)} kgf/m²</span>
+    <span>吊索掛數 n<sub>R</sub></span><span>${d.nRope}</span><span>軸力</span><span>各節均計入（通用式，見 2-2）</span>
+    <span>伸臂角 θ</span><span>${d.thetaFromR ? `由作業半徑反算：θ = cos⁻¹[(R + a) / 伸臂長]，a = ${f(d.rOff || 0, 2)} m（伸臂腳銷在迴轉中心後方之距離）` : '依原廠荷重表所列各荷重點之伸臂角'}</span>
     <span>重心位置資料</span><span>${C.eff.mode === 'est' ? '自行計算（依伸臂長度推算，以旋轉中心為基準點）' : `原廠計算書（${esc(S.project.model)}）`}</span></div>
     <h3>伸臂材料</h3>
     <div class="kv"><span>抗拉強度 σB</span><span>${f(d.sigB, 0)} kgf/cm² 以上</span><span>降伏應力 σy</span><span>${f(d.sigY, 0)} kgf/cm² 以上</span>
@@ -1216,24 +1254,45 @@ function buildPrint() {
     <p style="font-weight:700">結論：${C.ok ? `各節伸臂臨界斷面之合成應力均未超過容許應力（拉 ${f(sa, 0)}、壓 ${f(sigAc(), 0)} kgf/cm²）${C.fat ? '，最大應力未超過疲勞限' : ''}，強度足夠。` : '有應力超過容許值或輸入資料有誤，請檢討。'}（最大應力比 ${f(C.maxU, 3)}）</p></div>`;
   // --- 2 計算方法 ---
   o += `<div class="sheet">${ph('2. 計算方法')}<h2>2. 伸臂強度計算方法</h2><div class="formula">
-    <p>各斷面之應力為垂直荷重、水平荷重及風荷重所生應力之合成；鋼索同步伸縮之伸臂另計軸力。</p>
+    <p>各斷面之應力為垂直荷重、水平荷重及風荷重所生應力之合成，另計入沿伸臂方向之軸力。各節伸臂取其臨界斷面（應力最大處）檢核；長度單位 cm，力單位 kgf，應力單位 kgf/cm²。</p>
     <h4>2-1 垂直荷重所生彎曲應力</h4>
     <div class="eq">σ₁ = M<sub>x</sub> / Z<sub>x1</sub>（拉側）…(1)　σ₁′ = M<sub>x</sub> / Z<sub>x2</sub>（壓側）…(2)</div>
     <div class="eq">M<sub>x</sub> = {ψ₁·W·L + ψ₂(Σℓi·Gi + ½·wi·ℓ₀²)} cos θ　…(3)</div>
-    <div class="eq">W：額定荷重（含吊具）；Gi：各部重量；wi：伸臂單位長重量；θ：伸臂角<br>L、ℓi、ℓ₀：自臨界斷面至頂端滑輪銷、各部重心、本節伸臂頂端之距離。${C.eff.mode === 'est' ? '<br>（實測估算：ℓ = x − x<sub>斷面</sub>，x 為自伸臂最底端旋轉中心起算之位置）' : ''}</div>
-    ${d.axial === 'wire' ? `<h4>2-2 軸力所生應力（鋼索同步伸縮）</h4>
-    <div class="eq">N<sub>n</sub> = (ψ₁·W + ψ₂·G<sub>n</sub>)·sin θ + ψ₁·W/n …(7)　N<sub>n−1</sub> = 2N<sub>n</sub> + ψ₂·G<sub>n−1</sub>·sin θ …(6)</div>
-    <div class="eq">N<sub>n−2</sub> = 2N<sub>n−1</sub> − N<sub>n</sub> + ψ₂·G<sub>n−2</sub>·sin θ …(5)　N<sub>n−3</sub> = N<sub>n−1</sub>（拉力）…(4)</div>
-    <div class="eq">壓縮：σ₂ = −N/A，σ₂′ = ω·N/A；拉伸：σ₂ = N/A，σ₂′ = −N/A；λ = 2ℓ/k<sub>y</sub>，ω 由 λ 求得${d.omegaMode === 'table' ? '（自訂 λ–ω 表）' : d.omegaMode === 'code' ? '（查規定挫屈係數表，依降伏強度分級）' : '（依限界細長比 Λ 之公式計算）'}</div>` : ''}
+    <div class="eq">σ₁、σ₁′：垂直荷重所生彎曲應力（σ₁ 為斷面拉側，σ₁′ 為斷面壓側）<br>
+      M<sub>x</sub>：垂直荷重對臨界斷面所生彎矩（kgf·cm）<br>
+      Z<sub>x1</sub>、Z<sub>x2</sub>：臨界斷面對水平軸（x 軸）之斷面係數（Z<sub>x1</sub> 為拉側、Z<sub>x2</sub> 為壓側，cm³）<br>
+      ψ₁：動荷重係數（乘於額定荷重）；ψ₂：靜荷重係數（乘於伸臂等自重）<br>
+      W：額定荷重（含吊具）；θ：伸臂角（伸臂與水平面之夾角）<br>
+      L：自臨界斷面至頂端滑輪銷之距離<br>
+      Gi：臨界斷面外側之各部重量（前端各節伸臂、油壓缸、滑輪等）；ℓi：自臨界斷面至各部重心之距離<br>
+      wi：本節伸臂單位長重量（kgf/cm）；ℓ₀：自臨界斷面至本節伸臂頂端之距離（本節伸臂在斷面外側之長度）<br>
+      ½·wi·ℓ₀²：本節伸臂在斷面外側部分之自重所生彎矩（均佈荷重 wi × 長度 ℓ₀ × 力臂 ℓ₀/2）。${C.eff.mode === 'est' ? '<br>（實測估算：ℓ = x − x<sub>斷面</sub>，x 為自旋轉中心起算之位置）' : ''}</div>
+    <h4>2-2 軸力所生應力</h4>
+    <div class="eq">N = (ψ₁·W + ψ₂·ΣG)·sin θ + ψ₁·W / n<sub>R</sub>　…(4)</div>
+    <div class="eq">σ₂ = −N / A（拉側）　σ₂′ = ω·N / A（壓側）　λ = 2ℓ / k<sub>y</sub>　…(5)</div>
+    <div class="eq">各節伸臂臨界斷面均計入軸向壓力，不分伸縮方式（油壓缸或鋼索）及油壓缸支數。<br>
+      N：臨界斷面所受軸向壓力（kgf），為吊荷及伸臂自重沿伸臂方向之分力，加上捲揚鋼索沿伸臂拉回捲揚機之張力<br>
+      ΣG：臨界斷面外側之重量合計 = ΣGi + wi·ℓ₀（Gi、wi、ℓ₀ 同 2-1）<br>
+      n<sub>R</sub>：吊索掛數（吊鉤鋼索之掛數；ψ₁·W / n<sub>R</sub> 為捲揚鋼索張力）<br>
+      σ₂、σ₂′：軸力所生應力（σ₂ 計入斷面拉側，σ₂′ 計入斷面壓側）；A：臨界斷面之斷面積（cm²）<br>
+      ω：挫屈係數，由有效細長比 λ ${d.omegaMode === 'table' ? '查自訂 λ–ω 表求得' : d.omegaMode === 'code' ? '查規定挫屈係數表（依降伏強度分級）求得' : '依公式求得：λ ≤ Λ 時 ω = (1.5 + ⅔(λ/Λ)²) / [1.5(1 − 0.4(λ/Λ)²)]，λ > Λ 時 ω = 2.407(λ/Λ)²；Λ：限界細長比 = √(π²E / 0.6σy)，E 為彈性係數、σy 為降伏應力'}<br>
+      λ：有效細長比；ℓ：挫屈長度（最前端節為臨界斷面至頂端滑輪銷之距離，其餘各節為本節臨界斷面至外側下一節臨界斷面之距離）；k<sub>y</sub>：臨界斷面對 y 軸之迴轉半徑（cm）</div>
     <h4>2-3 水平荷重所生彎曲應力</h4>
-    <div class="eq">σ₃ = M<sub>y</sub> / Z<sub>y</sub> …(19)　M<sub>y</sub> = φ(W·L + ΣGi·ℓi + ½·wi·ℓ₀²) cos θ …(20)</div>
+    <div class="eq">σ₃ = M<sub>y</sub> / Z<sub>y</sub> …(6)　M<sub>y</sub> = β(W·L + ΣGi·ℓi + ½·wi·ℓ₀²) cos θ …(7)</div>
+    <div class="eq">σ₃：水平荷重（迴轉、起動停止之慣性力）所生側向彎曲應力<br>
+      M<sub>y</sub>：水平荷重對臨界斷面所生側向彎矩（kgf·cm）；β：水平荷重係數（水平荷重 = β × 垂直荷重）<br>
+      Z<sub>y</sub>：臨界斷面對垂直軸（y 軸）之斷面係數（cm³）；W、L、Gi、ℓi、wi、ℓ₀、θ 同 2-1。</div>
     <h4>2-4 風荷重所生彎曲應力</h4>
-    <div class="eq">σ₄ = M<sub>w</sub> / Z<sub>y</sub> …(21)　M<sub>w</sub> = ΣWgi·ℓi …(22)　Wg = q·C·A …(23)</div>
-    <div class="eq">A：各節伸臂側面外露受風面積，受風中心取外露段中點。</div>
+    <div class="eq">σ₄ = M<sub>w</sub> / Z<sub>y</sub> …(8)　M<sub>w</sub> = ΣWgi·ℓwi …(9)　Wgi = q·C·Awi …(10)</div>
+    <div class="eq">σ₄：風荷重所生側向彎曲應力；M<sub>w</sub>：風荷重對臨界斷面所生彎矩（kgf·cm）；Z<sub>y</sub> 同 2-3<br>
+      Wgi：臨界斷面外側各節伸臂所受風荷重（kgf）；ℓwi：自臨界斷面至各節受風中心之距離（受風中心取外露段中點）<br>
+      q：速度壓（kgf/m²）；C：風力係數；Awi：各節伸臂側面外露之受風面積（外露長度 × 伸臂高度，m²）</div>
     <h4>2-5 合成應力</h4>
-    <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄（拉側）…(24) ≤ σa　σc = σ₁′ + σ₂′ + σ₃ + σ₄（壓側）…(25) ≤ σca</div>
-    <div class="eq">σa：容許拉應力；σca：容許壓應力（數值及計算過程見「1. 計算標準與結果」）。應力比 = max(σt ÷ σa, σc ÷ σca)，≦ 1 為合格。</div>
-    ${d.fatigueOn ? `<h4>疲勞檢核</h4><div class="eq">依 S-N 線圖，伸臂合成拉應力 σt 之最大值不超過鋼材疲勞限時，不致疲勞破壞。</div>` : ''}
+    <div class="eq">σt = σ₁ + σ₂ + σ₃ + σ₄（拉側）…(11) ≤ σa　σc = σ₁′ + σ₂′ + σ₃ + σ₄（壓側）…(12) ≤ σca</div>
+    <div class="eq">σt：斷面拉側之合成應力；σc：斷面壓側之合成應力（無軸力之伸臂，σ₂、σ₂′ 取 0）<br>
+      σa：容許拉應力；σca：容許壓應力（數值及計算過程見「1. 計算標準與結果」）<br>
+      應力比 = max(σt ÷ σa, σc ÷ σca)，≦ 1 為合格。</div>
+    ${d.fatigueOn ? `<h4>疲勞檢核</h4><div class="eq">依 S-N 線圖，伸臂合成拉應力 σt 之最大值不超過鋼材疲勞限時，不致疲勞破壞。疲勞限：鋼材於反覆荷重下不致疲勞破壞之應力上限。</div>` : ''}
     </div></div>`;
   // --- 3 斷面 ---
   const sc = drawingScale(C.geo);
@@ -1290,6 +1349,7 @@ function buildPrint() {
       o += `</tbody></table></div>`;
     });
   }
+  o += constTableHTML(C) + windTableHTML(C);
   o += `</div>`;
   // --- 5 結果（橫式） ---
   const groups = pageGroups(S.stages.map(st => st.rows.length), 30);
@@ -1306,7 +1366,7 @@ function buildPrint() {
   if ($('#pvDetail').checked) {
     C.sum.forEach((m, k) => {
       if (!m.gov) return;
-      o += `<div class="sheet">${ph('6. 計算明細')}<h2>6. 控制條件計算明細 — 斷面 ${secName(k)}（${caseTxt(m.gov)}）</h2><div class="formula">${detailHTML(C, m.gov.s, m.gov.r, k)}</div></div>`;
+      o += `<div class="sheet">${ph('6. 計算明細')}<h2>6. 各斷面最不利性能計算明細 — 斷面 ${secName(k)}（${caseTxt(m.gov)}）</h2><div class="formula">${detailHTML(C, m.gov.s, m.gov.r, k)}</div></div>`;
     });
   }
   o += `<div class="sheet">${ph('附錄　吊升荷重表')}<h2>附錄　吊升荷重表</h2>${loadChartHTML()}</div>`;

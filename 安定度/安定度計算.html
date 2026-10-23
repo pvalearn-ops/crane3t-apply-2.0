@@ -67,6 +67,8 @@
   .badge.ok{background:var(--ok);} .badge.ng{background:var(--ng);} .badge.na{background:#999;}
   .resultline{font-size:15px;margin:10px 0;padding:8px 12px;background:#fbfcfe;
     border:1px solid var(--border);border-radius:5px;}
+  /* 計算式與代入值（供驗算） */
+  .calcnote{font-size:12.5px;line-height:1.75;color:#333;margin:6px 0 10px;padding:6px 12px;border-left:3px solid var(--border);}
   .imgslot{margin:12px 0;text-align:center;}
   .imgslot figure{margin:0;display:inline-block;max-width:100%;}
   .imgslot img{max-width:100%;border:1px solid #bbb;border-radius:4px;background:#fff;min-height:60px;}
@@ -95,6 +97,17 @@
     .page{box-shadow:none;border:none;page-break-after:always;padding:0;}
     .wrap{margin:0;max-width:none;}
     #page-a4{page:a4land;}
+    /* 附件4 橫式 A4（可印寬約 281 mm）：縮小字級與間距、表頭可換行、隱藏刪除欄，使全表塞進一頁寬 */
+    #page-a4 .tbl-scroll{overflow:visible;}
+    #a4Table{width:100%;font-size:10.5px;line-height:1.3;}
+    #a4Table th,#a4Table td{padding:2px 3px;}
+    #a4Table th{white-space:normal;}
+    #a4Table input[type=number]{width:52px;font-size:10.5px;padding:0;}
+    #a4Table tr:first-child th:last-child{display:none;}
+    #a4Table tr.sec .secheader{font-size:11.5px;padding:3px 6px;}
+    #a4Table tr.sec .secheader b{font-size:12.5px;}
+    #page-a4 h1{font-size:18px;margin-bottom:8px;}
+    #page-a4 .sub,#page-a4 .calcnote{font-size:10.5px;}
     input[type=number]{border:none;background:none !important;color:#000;
       -webkit-appearance:none;appearance:none;}
     .prow.derived input{background:none;}
@@ -118,21 +131,29 @@
 
   <h2>一、計算數據</h2>
   <div class="params" id="paramGrid"></div>
+  <div class="calcnote" id="f_derived">-</div>
 
   <h2>二、後方安定度</h2>
   <p style="font-size:13px">依據移動式起重機安全檢查構造標準第17條第一項第一款：伸臂中心線之鉛直面與起重機之行駛方向成直角時，位於伸臂所在側支點上之重量，應為起重機重量之百分之十五以上。</p>
   <div class="imgslot"><figure><img src="rear_perpendicular.png" alt="後方安定度(直角)示意圖"><figcaption>後方安定度（直角）示意圖</figcaption></figure></div>
   <div class="formula">Ra ≧ 0.15 × Wb ，∵ Ra ＝ L1 × Wb / B1 ∴ L1 / B1 ≧ 0.15</div>
+  <div class="calcnote">Ra：伸臂所在側支點上之重量；L1：起重機合成重心至伸臂反側車輪支點之水平距離（伸臂於最大起伏角 θm、伸出 1 節）<br>
+    L1 ＝ [(Ws＋Wf)×B1/2 ＋ Wr×(d1×cosθm＋B1/2) ＋ Wh×(L1′×cosθm＋B1/2)] / Wb<br><span id="f_L1">-</span></div>
   <div class="resultline">⇒ L1 / B1 ＝ <span class="out" id="r_L1">-</span> / <span class="out" id="r_B1">-</span> ＝ <span class="out" id="r_L1B1">-</span> <span id="b_back1" class="badge na">-</span></div>
 
   <p style="font-size:13px;margin-top:18px">依據第17條第一項第二款：伸臂中心線之鉛直面與起重機之行駛方向一致時，位於伸臂所在側支點上之重量，應大於起重機重量之百分之十五與平均輪距和軸距之比值之乘積。</p>
   <div class="imgslot"><figure><img src="rear_parallel.png" alt="後方安定度(平行)示意圖"><figcaption>後方安定度（平行）示意圖</figcaption></figure></div>
   <div class="formula">Rb ≧ 0.15 × Wb × B / H ，∵ Rb ＝ L2 × Wb / H ∴ L2 / B ≧ 0.15</div>
+  <div class="calcnote">Rb：伸臂所在側車軸上之重量；L2：起重機合成重心至伸臂反側車軸（前軸）之水平距離；車台（不含起重機）重心取距前軸 H/3<br>
+    L2 ＝ [Ws×H/3 ＋ Wf×S ＋ Wr×(d1×cosθm＋S) ＋ Wh×(L1′×cosθm＋S)] / Wb<br><span id="f_L2">-</span></div>
   <div class="resultline">⇒ L2 / B ＝ <span class="out" id="r_L2">-</span> / <span class="out" id="r_B">-</span> ＝ <span class="out" id="r_L2B">-</span> <span id="b_back2" class="badge na">-</span></div>
 
   <h2>三、前方安定度</h2>
   <p style="font-size:13px">除水上起重機外，移動式起重機之前方安定度值，應為 1.15 以上。SF ＝ (Wp＋Wa＋Wo)／(Wp＋Wa) ≧ 1.15，影響前方安定度之重量取最不利安定之狀態（詳附件4）。</p>
   <div class="note" id="worstNote">-</div>
+  <div class="calcnote">Wp：伸臂重量中之前端等價質量（附件2）；Wa：吊升荷重；Wo：安定餘裕（翻倒負荷 Wo′ 扣除吊升荷重中吊具以外之部分）<br>
+    θ ＝ cos⁻¹(r / L)；d：該伸出狀態之伸臂重心距旋轉中心（附件1）<br>
+    Wo′ ＝ [(Ws＋Wf)×Lw/2 － Wh×Lw/2 － Wr×d×cosθ] / (r － Lw/2) / 1000（公噸）；Wo ＝ Wo′ － (Wa － Wh) / 1000<br><span id="f_front">-</span></div>
   <div class="imgslot"><figure><img src="front.png" alt="前方安定度示意圖"><figcaption>前方安定度示意圖</figcaption></figure></div>
   <div class="formula">
     SF ＝
@@ -145,6 +166,7 @@
   <h2>四、左右方安定度</h2>
   <p style="font-size:13px">除履帶式起重機外，於行駛方向為水平且堅固地面上，左右方向傾斜30度時不致翻倒。L′×cos30° ≧ h′×sin30° ⇒ L′×√3 / h′ ≧ 1</p>
   <div class="imgslot"><figure><img src="side.png" alt="左右方安定度示意圖"><figcaption>左右方安定度示意圖</figcaption></figure></div>
+  <div class="calcnote">L′：起重機合成重心至傾斜側車輪之水平距離 ＝ B / 2；h′：起重機合成重心至地面之垂直距離（附件3）</div>
   <div class="resultline">⇒ <span class="out" id="r_Lp">-</span> × √3 / <span class="out" id="r_hp">-</span> ＝ <span class="out" id="r_side">-</span> <span id="b_side" class="badge na">-</span></div>
 </div>
 
@@ -200,6 +222,7 @@
     <span class="frac"><span class="n">Ws×h1 ＋ Wf×h2 ＋ Wh×h3 ＋ Wr×h4</span><span class="d">Ws ＋ Wf ＋ Wh ＋ Wr</span></span>
     ＝ <span class="out" id="r_hprime">-</span> (cm)
   </div>
+  <div class="calcnote" id="f_hprime">-</div>
 </div>
 
 <!-- ===================== PAGE 5 : 附件4 ===================== -->
@@ -207,6 +230,9 @@
   <h1>附件4　前方安定度計算</h1>
   <p class="sub">伸臂長度以區段標題呈現於各組上方；於各區段標題右側按「＋ 新增列」即可在該伸臂長度下新增一列（空白供輸入）。SF 最小（最不利）之列以黃底標示，並帶回第一頁前方安定度。此頁列印時自動採橫印。</p>
   <div class="tbl-scroll"><table id="a4Table"></table></div>
+  <div class="calcnote">計算式：θ ＝ cos⁻¹(r / L)；d、Wp 依該伸臂長度之伸出狀態（附件1、附件2）；
+    翻倒負荷 Wo′ ＝ [(Ws＋Wf)×Lw/2 － Wh×Lw/2 － Wr×d×cosθ] / (r － Lw/2) / 1000；安定餘裕 Wo ＝ Wo′ － (Wa － Wh) / 1000；
+    SF ＝ (Wp＋Wa＋Wo) / (Wp＋Wa)（Wa 以公噸計）。r ≦ Lw/2 時作業半徑在外伸撐座支點以內，無前方翻倒之虞。</div>
 </div>
 
 </div>
@@ -350,6 +376,22 @@ function paintMain(ctx){
   setTxt('r_Lp',fmt(Lprime,2)); setTxt('r_hp',fmt(hprime,3)); setTxt('r_side',fmt(Lprime*Math.sqrt(3)/hprime,4));
   badge('b_side', Lprime*Math.sqrt(3)/hprime, 1, '≧ 1  OK！','＜ 1  不符規定！');
   setTxt('r_hprime',fmt(hprime,3));
+  // 計算式代入值（供讀者驗算）
+  const E=ctx.E, Ws=E.Ws, Wr=E.Wr, Wf=pn('Wf'), Wh=pn('Wh'), Wb=pn('Wb'), B1=pn('B1'), H=pn('H'), S=pn('S');
+  const d1=derived.d1, L1p=derived.L1p, cTm=Math.cos(rad(pn('thetaM'))), n0=v=>fmt(v,0), n2=v=>fmt(v,2), n3=v=>fmt(v,3);
+  setTxt('f_derived','Wr ＝ 伸臂重量 ＋ 油壓缸重量 ＝ '+n0(E.segW.reduce((a,b)=>a+b,0))+' ＋ '+n0(E.cylW.reduce((a,b)=>a+b,0))+' ＝ '+n0(Wr)+' kg；'
+    +'Ws ＝ Wb － Wf － Wr － Wh ＝ '+n0(Wb)+' － '+n0(Wf)+' － '+n0(Wr)+' － '+n0(Wh)+' ＝ '+n0(Ws)+' kg；'
+    +'B ＝ (B1＋B2)/2 ＝ ('+fmt(B1,1)+' ＋ '+fmt(pn('B2'),1)+') / 2 ＝ '+n2(Bavg)+' cm；'
+    +'L1′、d1：伸出 1 節時之伸臂長度及伸臂重心距旋轉中心（附件1）；cosθm ＝ cos'+fmt(pn('thetaM'),1)+'° ＝ '+fmt(cTm,5));
+  setTxt('f_L1','＝ [('+n0(Ws)+'＋'+n0(Wf)+')×'+fmt(B1,1)+'/2 ＋ '+n0(Wr)+'×('+n3(d1)+'×'+fmt(cTm,5)+'＋'+fmt(B1,1)+'/2) ＋ '+n0(Wh)+'×('+n2(L1p)+'×'+fmt(cTm,5)+'＋'+fmt(B1,1)+'/2)] / '+n0(Wb)+' ＝ '+fmt(L1,4)+' cm');
+  setTxt('f_L2','＝ ['+n0(Ws)+'×'+fmt(H,1)+'/3 ＋ '+n0(Wf)+'×'+fmt(S,1)+' ＋ '+n0(Wr)+'×('+n3(d1)+'×'+fmt(cTm,5)+'＋'+fmt(S,1)+') ＋ '+n0(Wh)+'×('+n2(L1p)+'×'+fmt(cTm,5)+'＋'+fmt(S,1)+')] / '+n0(Wb)+' ＝ '+fmt(L2,4)+' cm');
+  setTxt('f_hprime','代入：h′ ＝ ('+n0(Ws)+'×'+fmt(pn('h1'),1)+' ＋ '+n0(Wf)+'×'+fmt(pn('h2'),1)+' ＋ '+n0(Wh)+'×'+fmt(pn('h3'),1)+' ＋ '+n0(Wr)+'×'+fmt(pn('h4'),1)+') / ('+n0(Ws)+' ＋ '+n0(Wf)+' ＋ '+n0(Wh)+' ＋ '+n0(Wr)+') ＝ '+n3(hprime)+' cm');
+  if(worst){
+    const w=worst, Lw=pn('Lw'), r=Number(w.row.r), L=Number(w.row.L);
+    setTxt('f_front','最不利位置代入：θ ＝ cos⁻¹('+fmt(r,1)+' / '+fmt(L,1)+') ＝ '+fmt(w.theta,2)+'°，d ＝ '+n3(w.d)+' cm，d×cosθ ＝ '+n2(w.dcos)+' cm；'
+      +'Wo′ ＝ [('+n0(Ws)+'＋'+n0(Wf)+')×'+fmt(Lw,1)+'/2 － '+n0(Wh)+'×'+fmt(Lw,1)+'/2 － '+n0(Wr)+'×'+n2(w.dcos)+'] / ('+fmt(r,1)+' － '+fmt(Lw,1)+'/2) / 1000 ＝ '+n3(w.K)+' t；'
+      +'Wo ＝ '+n3(w.K)+' － ('+w.row.Wa+' － '+n0(Wh)+') / 1000 ＝ '+n3(w.Wo)+' t；Wp ＝ '+fmt(w.O,4)+' t（附件2）');
+  } else setTxt('f_front','-');
   if(worst){
     const Wp=worst.O, Wa=Number(worst.row.Wa)/1000, Wo=worst.Wo;
     setTxt('worstNote','本機具最不利位置為：伸臂長度 '+worst.row.L+' cm、作業半徑 '+worst.row.r+' cm、吊升荷重 '+worst.row.Wa+' kg（詳附件4）');

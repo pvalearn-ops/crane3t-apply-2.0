@@ -108,7 +108,7 @@
 
   /* 自行計算之空白範本：設計條件採現行規格預設值，其餘留空待填 */
   /* 自行計算（非原廠）之材料值：依台灣法規認可值；熔接效率預帶 0.8（有非破壞檢測可改 1.0） */
-  const SELF_DESIGN = { sigB: 6000, sigY: 4580, E: 2100000, weldEff: 0.8, rOff: 0.2 };   // rOff：迴轉中心至伸臂腳銷偏移預設 20 cm
+  const SELF_DESIGN = { sigB: 6000, sigY: 4600, E: 2100000, weldEff: 0.8, rOff: 0.2 };   // rOff：迴轉中心至伸臂腳銷偏移預設 20 cm
   function dataBlank(N = 5) {
     const n = n_;
     return {

@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261022d';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261023o';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -355,7 +355,7 @@ function writeFinalChart(r) {
   if (JSON.stringify(Store.subGet(cur.id, 'final_chart')) !== JSON.stringify(v)) Store.subSet(cur.id, 'final_chart', v);
 }
 function stepState(step) {
-  if (step === 'step1') { const chosen = cur.hasChart === true || cur.hasChart === false; return chosen && (cur.hasChart === false || (cur.origChart.booms.length && !chartIssues(cur.origChart).list.length)) ? 'done' : (chosen || curFiles.length ? 'part' : 'todo'); }
+  if (step === 'step1') { const chosen = cur.hasChart === true || cur.hasChart === false; return chosen && N(cur.crane.orig_capacity_t) > 0 && (cur.hasChart === false || (cur.origChart.booms.length && !chartIssues(cur.origChart).list.length)) ? 'done' : (chosen || curFiles.length ? 'part' : 'todo'); }
   if (step === 'step2') return s2Missing(cur).length === 0 ? 'done' : (cur.company.name || cur.vehicle.plate || cur.platform.weight_kg ? 'part' : 'todo');
   if (step === 'step3') { const b = boomRes(cur); return b && b.has ? (b.valid ? 'done' : 'part') : (Store.subGet(cur.id, 'boomStrengthCalc.v1') ? 'part' : 'todo'); }
   if (step === 'step4') { const r = Calc.compute(cur); return r.ok ? (Object.values(r.checks).every(x => x.ok) ? 'done' : 'part') : 'todo'; }
@@ -580,7 +580,7 @@ function s13Html() {
     <div class="stage-list">${stages.map((v, i) => `<label class="field"><span>${i === 0 ? '全縮（第1節）' : '伸出至第 ' + (i + 1) + ' 節'}</span><div class="unit-in"><input data-st="${i}" value="${esc(v)}" inputmode="decimal" class="${N(v) > 0 ? '' : 'missing'}"><em>m</em></div></label>`).join('')}
       <button class="btn btn-outline" id="stAdd">➕</button><button class="btn btn-danger-outline" id="stDel">➖</button></div>`}
     <div class="fgrid" style="margin-top:12px">
-      ${F('crane.orig_capacity_t', '原吊升荷重（銘牌）', { unit: '公噸', num: true, req: !cur.hasChart, hint: '用於推估伸臂重量' + (cur.hasChart ? '；未填時以荷重表最大值反推' : '') })}
+      ${F('crane.orig_capacity_t', '吊升荷重', { unit: '公噸', num: true, req: true, hint: '依銘牌或原廠荷重性能表之最大吊升荷重；新荷重表各值不超過此值，並用於推估伸臂重量' })}
       ${F('boom.numCyl', '油壓缸支數（逐節伸出）', { num: true, ph: String(Math.floor(stages.length / 2)), hint: '依序伸出的節數；同步伸縮者不計。不確定可留空（預設 節數÷2）' })}
       ${cur.hasChart ? '' : F('stab.Wh', '吊具組（吊鉤）重量 Wh', { unit: 'kg', num: true, req: true, hint: '秤重或銘牌；荷重表數值含吊具重量' })}
     </div>
@@ -710,7 +710,7 @@ function basicCardsHtml() {
     <div class="fgrid">
       ${F('crane.type', '種類及型式', { ph: '積載型起重機' })}${F('crane.maker', '起重機製造商')}${F('crane.model', '起重機型號')}${F('crane.serial', '製造序號')}
       ${F('crane.mfg_year', '製造年月', { type: 'month', hint: '只需年、月（帶入明細表製造年月）' })}
-      <p class="hint" style="grid-column:1/-1;margin:0">原吊升荷重（銘牌）、油壓缸支數請填在 S1-3。</p>
+      <p class="hint" style="grid-column:1/-1;margin:0">吊升荷重、油壓缸支數請填在 S1-3。</p>
     </div>
   </div>`;
 }
@@ -804,10 +804,10 @@ const BOOM_MACHINES = () => (window.BoomLib && window.BoomLib.MACHINES) || {};
 /* 伸臂強度資料：型號（或資料庫型號）須與伸臂強度計算書資料庫完全一致 */
 function boomDbOf(c) { const M = BOOM_MACHINES(); for (const k of [c.crane.dbModel, c.crane.model].map(normModel)) if (k && M[k]) return k; return null; }
 const boomLabel = (id) => { const M = BOOM_MACHINES()[id]; return M ? `${M.brand} ${M.model}（原廠計算書 ${M.doc}）` : id; };
-const HAS_LABEL = { chart: '荷重性能表', boom: '伸臂強度資料', wt: '伸臂與油壓缸重量', lw: '撐座全伸寬度', hook: '吊鉤重量', angle: '最大起伏角', cap: '原吊升荷重' };
+const HAS_LABEL = { chart: '荷重性能表', boom: '伸臂強度資料', wt: '伸臂與油壓缸重量', lw: '撐座全伸寬度', hook: '吊鉤重量', angle: '最大起伏角', cap: '吊升荷重' };
 const HAS_NEED = { chart: 'S1-3 荷重性能表（上傳＋AI 判讀或自行輸入）', boom: 'S3 伸臂斷面尺寸、板厚、各部重量與位置（依原廠伸臂強度計算書或實測）',
   wt: 'S2-5 伸臂各節與伸縮油壓缸重量（原廠資料；未填時以經驗公式推估）',
-  lw: 'S2-6 外伸撐座全伸寬度 Lw（實測）', hook: 'S1-3／S2-6 吊具組（吊鉤）重量 Wh（秤重或銘牌）', angle: 'S2-6 伸臂最大起伏角 θm（型錄）', cap: 'S1-3 原吊升荷重（銘牌）' };
+  lw: 'S2-6 外伸撐座全伸寬度 Lw（實測）', hook: 'S1-3／S2-6 吊具組（吊鉤）重量 Wh（秤重或銘牌）', angle: 'S2-6 伸臂最大起伏角 θm（型錄）', cap: 'S1-3 吊升荷重（銘牌）' };
 /* 由伸臂強度計算書之荷重點建立荷重性能表：每格取該半徑以外最近荷重點之值（保守），不在列上的點註記實際半徑 */
 function chartFromBoom(d) {
   const st = d.stages.filter(x => x.len > 0).slice().sort((a, b) => a.len - b.len);
@@ -1129,7 +1129,7 @@ function pStep2(pane) {
   </div>
   <div class="card">
     <h2>S2-5　伸臂與油壓缸重量</h2>
-    <p class="hint">伸臂各段長度依 S1-3（${stages.map(N).filter(x => x > 0).join('、') || '尚未設定'} m）；原吊升荷重、油壓缸支數請於 S1-3 填寫。</p>
+    <p class="hint">伸臂各段長度依 S1-3（${stages.map(N).filter(x => x > 0).join('、') || '尚未設定'} m）；吊升荷重、油壓缸支數請於 S1-3 填寫。</p>
     <div class="fgrid">
       ${F('boom.weightMode', '伸臂重量來源', { type: 'select', options: [['auto', est.bySec ? '自動推估（依斷面單位重量）' : cur.hasChart ? '自動推估＋依荷重表反算' : '自動推估（經驗公式）'], ['manual', '手動輸入（有原廠資料／實測）']] })}
     </div>
@@ -1148,7 +1148,7 @@ function pStep2(pane) {
     <div class="fgrid wide">
       ${DF('Wb', '起重機總重量 Wb（車重＋起重機）', 'kg', '請於 S2-2 填寫空重')}
       ${DF('Wf', '腳架、立柱（含旋轉座）重量 Wf', 'kg', '')}
-      ${cur.hasChart === false ? `<div class="field"><span>吊具組（吊鉤）重量 Wh <span class="tag link">S1-3</span></span><div class="unit-in"><input readonly value="${esc(cur.stab.Wh)}" class="${N(cur.stab.Wh) > 0 ? '' : 'missing'}"><em>kg</em></div><small>${N(cur.stab.Wh) > 0 ? '取自 S1-3' : '<span style="color:var(--ng)">請於 S1-3 填寫</span>'}</small></div>` : DF('Wh', '吊具組（吊鉤）重量 Wh', 'kg', '請填原吊升荷重，或輸入吊鉤秤重值')}
+      ${cur.hasChart === false ? `<div class="field"><span>吊具組（吊鉤）重量 Wh <span class="tag link">S1-3</span></span><div class="unit-in"><input readonly value="${esc(cur.stab.Wh)}" class="${N(cur.stab.Wh) > 0 ? '' : 'missing'}"><em>kg</em></div><small>${N(cur.stab.Wh) > 0 ? '取自 S1-3' : '<span style="color:var(--ng)">請於 S1-3 填寫</span>'}</small></div>` : DF('Wh', '吊具組（吊鉤）重量 Wh', 'kg', '請於 S1-3 填吊升荷重，或輸入吊鉤秤重值')}
       ${DF('thetaM', '伸臂最大起伏角 θm', '度', '')}
       ${F('stab.Lw', '外伸撐座全伸寬度 Lw', { unit: 'cm', num: true, req: true, hint: '實測左右撐座中心距；從資料庫選型號時自動帶入全張寬度。套用後標註於正面工程圖' })}
       <div class="field"><span>軸距 H <span class="tag link">帶入</span></span><div class="unit-in"><input readonly value="${esc(cur.vehicle.wheelbase_cm)}" class="${N(cur.vehicle.wheelbase_cm) > 0 ? ((cur.aiFilled || []).includes('vehicle.wheelbase_cm') ? 'ai-filled' : 'est-val') : 'missing'}"><em>cm</em></div><small>${N(cur.vehicle.wheelbase_cm) > 0 ? '取自 S2-2 車籍資料' : '<span style="color:var(--ng)">請於 S2-2 填寫軸距</span>'}</small></div>
@@ -1776,7 +1776,12 @@ function openPdfModal() {
   const m = $('#pdfModal');
   if (!cur.appliedAt) { alert('請先完成 S1～S5，並按左側「✅ 套用到申請文件」產生申請文件後，再產出 PDF。'); return; }
   const pr = progressOf(cur, curFiles);
+  // 以檔案方式（file://）開啟時，瀏覽器禁止讀取子頁面內容，申請書、明細表、各計算書都無法擷取
+  const isFile = location.protocol === 'file:';
   $('#pdfBody').innerHTML = `
+    ${isFile ? `<div class="callout danger"><b>目前是直接開啟檔案（網址為 ${esc(location.href.split('#')[0])}）</b>，瀏覽器的安全限制會讓申請書、明細表與各計算書無法放進 PDF。<br>
+      請改用網站網址開啟；或雙擊資料夾中的「<b>啟動網頁.bat</b>」，以 http://localhost:8767 開啟。<br>
+      注意：換網址開啟後看不到原本的申請案，請先在此按「匯出備份」，再到新網址「匯入」。</div>` : ''}
     ${pr.done < pr.total ? `<div class="callout warn">文件尚未全部完成（${pr.done}/${pr.total}）。仍可先產出檢視，未完成項目會在目錄中以紅字標示。</div>` : '<div class="callout ok">所有文件項目皆已完成。</div>'}
     ${cur.needReapply ? '<div class="callout danger">S1～S6 的資料在套用後有變更，申請文件尚未更新；建議先按左側「套用到申請文件」。</div>' : ''}
     <p class="hint">依「文件需求一覽」順序串接：封面＋目錄（含頁次）→ 各文件 → 上傳之附件（PDF 以原頁合併）。頁數多時約需 1–3 分鐘，請勿關閉網頁。</p>
