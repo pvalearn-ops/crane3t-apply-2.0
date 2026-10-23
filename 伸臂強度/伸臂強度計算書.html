@@ -293,6 +293,9 @@ function fixOldXsec(E) {
   const n = E.Xsec.length;
   for (let k = 1; k < n; k++) if (Number.isFinite(E.X[k - 1]) && E.Xsec[k] === E.X[k - 1]) E.Xsec[k] = xsecDefault(E.X, k, n);
 }
+/* 頂端滑輪銷位置 Xpin（全伸，自旋轉中心起算）＝ 最大伸臂長度（最末節伸臂頭端 X）；不另行輸入 */
+function xpinOf(E) { return E && Array.isArray(E.X) && E.X.length ? Number(E.X[E.X.length - 1]) : NaN; }
+function fixXpin(E) { if (E) { delete E.XpinOv; E.Xpin = xpinOf(E); } }
 function migrate(o) {
   const b = baseState();
   const S2 = Object.assign(b, o);
@@ -306,7 +309,7 @@ function migrate(o) {
   if (MACHINES[S2.src]) {   // 資料庫機具：鎖定欄位一律以資料庫為準
     const m = MACHINES[S2.src].data();
     LOCK_KEYS.forEach(k => S2[k] = m[k]); S2.est = m.est; S2.geoMode = 'oem'; S2.project.model = m.project.model;
-  } else if (S2.src === 'self') { S2.geoMode = 'est'; if (S2.est && Array.isArray(S2.est.Xsec) && !(S2.est.Xsec[0] > 0)) S2.est.Xsec[0] = 100; fixOldXsec(S2.est); }   // 此處 isNum 尚未定義，勿使用
+  } else if (S2.src === 'self') { S2.geoMode = 'est'; if (S2.est && Array.isArray(S2.est.Xsec) && !(S2.est.Xsec[0] > 0)) S2.est.Xsec[0] = 100; fixOldXsec(S2.est); fixXpin(S2.est); }   // 此處 isNum 尚未定義，勿使用
   S2.booms.forEach(bm => { if (bm.sec.fold === undefined) bm.sec.fold = bm.sec.dtL > 0 || bm.sec.dbL > 0; });
   fillGeo(S2);
   S2.ui = { det: (o.ui && o.ui.det) || { s: 0, r: 0, k: 0 } };
@@ -432,7 +435,7 @@ function estStage(d) {
   seg.forEach((sg, k) => { acc += sg * r[k]; tip.push(acc); });
   const shift = E.X.map((x, k) => x - tip[k]);
   const xsec = E.Xsec.map((x, k) => x - (k ? shift[k - 1] : 0));
-  const xpin = E.Xpin - shift[n - 1];
+  const xpin = xpinOf(E) - shift[n - 1];
   const itemX = E.items.map(it => {
     if (it.kind === 'boom') { const j = (it.boom | 0) - 1; return j >= 0 && j < n ? tip[j] - seg[j] / 2 : NaN; }
     if (it.kind === 'cyl') { const c = (it.cyl | 0) - 1; if (c < 0 || c >= n) return NaN; return ((tip[c] - seg[c]) + (c + 1 < n ? tip[c + 1] : tip[c])) / 2; }
@@ -590,6 +593,10 @@ function compute() {
     if (u > m.u) { m.u = u; m.gov = { s, r }; }
   })));
   const errs = geo.map((g, k) => g.err ? `斷面 ${secName(k)}：${g.err}` : null).filter(Boolean);
+  // 臨界斷面至頂端滑輪銷距離 L 必須為正；≦ 0 時彎矩為負、應力比失真（會誤判合格），列為錯誤
+  const badL = new Set();
+  eff.tables.forEach(T => T.forEach((t, k) => { if (t.active && !(t.L > 0)) badL.add(secName(k)); }));
+  if (badL.size) errs.push(`斷面 ${[...badL].join('、')} 至頂端滑輪銷之距離 L ≦ 0：請檢查伸臂頭端位置 X 與斷面位置（斷面須位於最大伸臂長度之內）`);
   const maxU = Math.max(...sum.map(m => m.u).filter(isFinite), 0);
   const any = sum.some(m => m.gov);
   // 疲勞：全伸臂合成拉應力最大值與疲勞限比較
@@ -997,7 +1004,7 @@ function geoEstInputs() {
   <tr><th style="text-align:left">外露長 = X<sub>k</sub> − X<sub>k−1</sub></th>${S.booms.map((_, k) => `<td class="n ro" id="seg-${k}"></td>`).join('')}</tr>
   <tr><th style="text-align:left">斷面位置 x<sub>斷面</sub></th>${S.booms.map((_, k) => `<td>${ni(`est.Xsec.${k}`)}</td>`).join('')}</tr>
   </table></div>
-  <div class="grid" style="margin-top:8px">${fld('頂端滑輪銷位置 X<sub>pin</sub>（全伸）', 'est.Xpin', 'cm')}</div>
+  <div class="grid" style="margin-top:8px"><div class="f"><label>頂端滑輪銷位置 X<sub>pin</sub>（全伸）＝ 最大伸臂長度</label><span class="calc" id="xpinAuto">${f(xpinOf(E), 1)}</span><span class="u">cm</span></div></div>
   <p class="note">斷面 ${secName(0)} 固定於第 1 節；斷面 ${secName(1)} 起位於前一節伸臂頭端內側，隨前一節一起移動；預設 x<sub>斷面</sub> = X<sub>k−1</sub> − 擋板數 × ${STOP_PLATE} cm（第 k 節之擋板數 = 總節數 − k + 1，例 5 節之 ${secName(1)} 扣 4 片）。滑輪銷隨最末節移動。各段之位置 = 全伸位置 − 該節縮回量。</p></div>
   <div class="card"><h3 style="margin-top:0">集中重量 Gi 與重心位置取法</h3><div class="tbl"><table>
   <tr><th>代號</th><th>名稱</th><th>重量 (kgf)</th><th>種類</th><th>對應</th><th>全伸時位置 x（附掛物）</th><th></th></tr>`;
@@ -1333,7 +1340,7 @@ function buildPrint() {
     const E = S.est;
     o += `<h3>全伸時各部位置（自旋轉中心起算，cm）　伸縮油壓缸 ${E.m} 支，第 ${E.m + 1} 節以後鋼索同步伸縮</h3>
     <table><thead><tr><th>項目</th>${S.booms.map((_, k) => `<th>${secName(k)}</th>`).join('')}<th>滑輪銷</th></tr></thead><tbody>
-    <tr><td>伸臂頭端 X</td>${E.X.map(x => `<td class="n">${f(x, 1)}</td>`).join('')}<td class="n">${f(E.Xpin, 1)}</td></tr>
+    <tr><td>伸臂頭端 X</td>${E.X.map(x => `<td class="n">${f(x, 1)}</td>`).join('')}<td class="n">${f(xpinOf(E), 1)}</td></tr>
     <tr><td>斷面位置</td>${E.Xsec.map(x => `<td class="n">${f(x, 1)}</td>`).join('')}<td></td></tr></tbody></table>
     <h3>表 2　各伸臂長度之位置與 L、ℓi（cm）</h3>${estOutHTML(C, false).replace(/class="card stage blk"/g, 'class="blk"')}`;
   } else {
@@ -1512,6 +1519,7 @@ function onEdit(el) {
   clearTimeout(tmr);
   tmr = setTimeout(() => {
     if (/^stages\.\d+\.len$/.test(k)) { renderChart(); renderGeo(); renderDetailShell(); }
+    if (/^est\.X\./.test(k) && S.est) { const a = $('#xpinAuto'); if (a) a.textContent = f(xpinOf(S.est), 1); }
     updateComputed();
   }, 150);
 }
@@ -1632,7 +1640,7 @@ function mergeSelf(sd) {
     sd.X.forEach((x, k) => { if (!isNum(E.X[k])) E.X[k] = x; });
     fixOldXsec(E);
     for (let k = 0; k < n; k++) if (!isNum(E.Xsec[k])) E.Xsec[k] = xsecDefault(E.X, k, n);
-    if (!isNum(E.Xpin)) E.Xpin = E.X[n - 1];
+    fixXpin(E);
   }
   // 重量：S2-5 為原廠／實測值時覆寫；推估值只補空白
   const putG = (it, v) => { if (isNum(v) && (sd.wManual || !isNum(it.G))) it.G = v; };

@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261023t';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261023w';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -574,9 +574,9 @@ function s13Html() {
   return `<div class="card">
     <h2>S1-3　荷重性能表與伸臂資料</h2>
     ${cur.hasChart ? `<p class="hint">來源：${cur.chartSource === 'ai' ? 'AI 判讀（請務必逐格核對）' : cur.chartSource === 'manual' ? '自行輸入' : '資料庫 ' + esc(cur.crane.dbModel || '')}。
-      <b>表頭各欄伸臂長度即為各伸出狀態之伸臂總長</b>（由全縮到全伸），S2～S4 一律以此為準；此表亦為 S4 荷重表反算之上限（原廠值）及 S3 伸臂強度計算之荷重點。</p>
+      <b>表頭各欄伸臂長度即為各伸出狀態之伸臂總長</b>（由全縮到全伸，自伸臂腳銷量至頂端滑輪銷），S2～S4 一律以此為準；此表亦為 S4 荷重表反算之上限（原廠值）及 S3 伸臂強度計算之荷重點。</p>
     <div id="chartEditor"></div>`
-    : `<p class="hint">沒有荷重性能表：請實測<b>每一個伸出狀態時的伸臂總長</b>（由全縮到全伸，單位 m），例如 5 節伸臂：3.15、5.15、7.05、8.95、10.85。</p>
+    : `<p class="hint">沒有荷重性能表：請實測<b>每一個伸出狀態時的伸臂總長</b>（由全縮到全伸，單位 m），<b>自伸臂腳銷中心量至頂端滑輪銷中心</b>，例如 5 節伸臂：3.15、5.15、7.05、8.95、10.85。全伸長度即為伸臂強度計算之頂端滑輪銷位置。</p>
     <div class="stage-list">${stages.map((v, i) => `<label class="field"><span>${i === 0 ? '全縮（第1節）' : '伸出至第 ' + (i + 1) + ' 節'}</span><div class="unit-in"><input data-st="${i}" value="${esc(v)}" inputmode="decimal" class="${N(v) > 0 ? '' : 'missing'}"><em>m</em></div></label>`).join('')}
       <button class="btn btn-outline" id="stAdd">➕</button><button class="btn btn-danger-outline" id="stDel">➖</button></div>`}
     <div class="fgrid" style="margin-top:12px">
