@@ -23,7 +23,7 @@
         axial: 'wire', nRope: 4,
         omegaMode: 'formula', omegaTable: null, omegaCls: 0, omegaRow: 'up',
         fatigueOn: false, fatigue: 3600, weldEff: 1,
-        round: 'ceil', thetaFromR: false, rOff: 0
+        round: 'ceil', thetaFromR: false, rOff: 0.21   // a = min(各節伸臂長 − 該節最大作業半徑)，13.31 − 13.1 = 0.21 m
       },
       shape: 'hex',
       booms: [

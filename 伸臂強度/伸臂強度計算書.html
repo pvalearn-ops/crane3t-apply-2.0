@@ -6,7 +6,7 @@
 <title>伸臂強度計算書</title>
 <script src="../shared/case-bridge.js?v=20261010y"></script>
 <script src="boom-geo.js?v=20261011f"></script>
-<script src="boom-db.js?v=20261023e"></script>
+<script src="boom-db.js?v=20261102b"></script>
 <style>
 :root{
   --ink:#1b2430; --muted:#5b6675; --line:#d5dbe3; --line2:#e8ecf1; --bg:#f3f5f8; --card:#fff;
@@ -309,6 +309,7 @@ function migrate(o) {
   if (MACHINES[S2.src]) {   // 資料庫機具：鎖定欄位一律以資料庫為準
     const m = MACHINES[S2.src].data();
     LOCK_KEYS.forEach(k => S2[k] = m[k]); S2.est = m.est; S2.geoMode = 'oem'; S2.project.model = m.project.model;
+    if (m.design && m.design.rOff != null) S2.design.rOff = m.design.rOff;   // 伸臂腳銷偏移 a 為機具固有尺寸，以資料庫為準
   } else if (S2.src === 'self') { S2.geoMode = 'est'; if (S2.est && Array.isArray(S2.est.Xsec) && !(S2.est.Xsec[0] > 0)) S2.est.Xsec[0] = 100; fixOldXsec(S2.est); fixXpin(S2.est); }   // 此處 isNum 尚未定義，勿使用
   S2.booms.forEach(bm => { if (bm.sec.fold === undefined) bm.sec.fold = bm.sec.dtL > 0 || bm.sec.dbL > 0; });
   fillGeo(S2);
@@ -494,6 +495,14 @@ function allowRows() {
 const sigA = () => sigA0() * S.design.kA * weld();
 const sigAc = () => sigA0() / C_DIV * S.design.kA * weld();
 const qWind = () => S.design.qk * Math.pow(Math.max(S.design.h, 16), 0.25);
+/* 伸臂腳銷在迴轉中心後方之距離 a（m）：有荷重性能表時 = min(各節伸臂長度 − 該節最大作業半徑)。
+   理論上各節差值相同；舊計算書可能不一，取最小值，確保 (R + a) ≦ 伸臂長，反算伸臂角不會無解。 */
+function aFromStages() {
+  const v = S.stages.map(st => { const rs = (st.rows || []).map(r => r[1]).filter(isNum); return st.len > 0 && rs.length ? st.len - Math.max(...rs) : null; }).filter(x => x != null);
+  return v.length ? Math.max(0, Math.round(Math.min(...v) * 1000) / 1000) : null;
+}
+const aAuto = () => S.src === 'self' && !NOCHART();   // 自行計算且有荷重性能表：a 自動計算
+function syncROff() { if (aAuto()) { const a = aFromStages(); if (a != null && a !== S.design.rOff) { S.design.rOff = a; save(); } } }
 function thetaOf(st, row) {
   const d = S.design;
   if (d.thetaFromR) {
@@ -572,6 +581,7 @@ function rowU(secs) {
   return u;
 }
 function compute() {
+  syncROff();
   const d = S.design, N = S.booms.length;
   const geo = S.booms.map(b => secGeom(S.shape, b.sec));
   const eff = effGeo(), items = eff.items;
@@ -841,7 +851,7 @@ function renderDesign() {
       <option value="round" ${d.round === 'round' ? 'selected' : ''}>整數四捨五入</option>
       <option value="dec1" ${d.round === 'dec1' ? 'selected' : ''}>小數一位</option></select></div>
     <div class="f"><label><input type="checkbox" data-k="design.thetaFromR" data-t="bool" data-struct="1" ${d.thetaFromR ? 'checked' : ''}> 由作業半徑反算伸臂角 θ</label></div>
-    ${fld('　反算用：伸臂腳銷在迴轉中心後方之距離 a', 'design.rOff', 'm', d.thetaFromR ? '' : 'disabled')}
+    ${fld(aAuto() ? '　反算用：伸臂腳銷在迴轉中心後方之距離 a（自動＝各節伸臂長度 − 該節最大作業半徑之最小值）' : '　反算用：伸臂腳銷在迴轉中心後方之距離 a', 'design.rOff', 'm', d.thetaFromR && !aAuto() ? '' : 'disabled')}
   </div>
   <p class="note">反算式 θ = cos⁻¹[(R + a) / 伸臂長]（R = 伸臂長·cosθ − a）；R + a 大於伸臂長時伸臂近水平，取 θ = 0°。未勾選時直接使用性能表輸入之 θ。</p></div>`;
   $('#p1').innerHTML = h;
@@ -1497,6 +1507,7 @@ function renderAll() {
   document.body.classList.toggle('s2', !!s2);
   document.querySelectorAll('nav a.st').forEach(a => a.classList.toggle('on', +a.dataset.step === (s2 ? 2 : 1)));
   if (!s2) { renderStep1(); $('#hdrInfo').textContent = ''; saveResult(null); return; }
+  syncROff();
   $('#srcBanner').innerHTML = srcBannerHTML();
   renderDesign(); renderChart(); renderSections(); renderGeo(); renderDetailShell();
   updateComputed();

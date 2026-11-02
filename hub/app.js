@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261024c';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
+const SUB_VER = '20261102c';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）
 
 /* ---------------- 路徑工具 ---------------- */
 const getP = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -220,8 +220,8 @@ function renderList() {
         <div class="title">${esc(m.name)}</div>
         <div class="meta">${esc(m.company || '（尚未填公司）')} ‧ ${esc(m.plate || '無車號')}</div>
         <div class="meta">最後更新：${new Date(m.updatedAt).toLocaleString('zh-TW', { hour12: false })}</div>
-        <div class="progress"><i style="width:${pr.pct}%"></i></div>
-        <div class="meta">文件進度 ${pr.done}/${pr.total}${c && c.result && c.result.ok ? ` ‧ 吊升荷重 <b>${c.result.liftT.toFixed(2)} t</b>` : ''}</div>
+        <div class="progress"><i data-prog-bar="${m.id}" style="width:${pr.pct}%"></i></div>
+        <div class="meta">文件進度 <span data-prog-txt="${m.id}">${pr.done}/${pr.total}</span>${c && c.result && c.result.ok ? ` ‧ 吊升荷重 <b>${c.result.liftT.toFixed(2)} t</b>` : ''}</div>
         <div class="btn-row">
           <button class="btn btn-primary" data-open="${m.id}">開啟</button>
           <button class="btn btn-outline" data-dup="${m.id}">📄 複製</button>
@@ -231,6 +231,14 @@ function renderList() {
       </div>`; }).join('')}</div>`
     : `<div class="empty"><div style="font-size:3rem">🗂️</div><p>尚無申請案，請按「建立申請案」開始。</p></div>`}
   </section>`;
+  // 進度須含上傳檔案（組配圖照片、材質證明、設置證明等）：檔案存於 IndexedDB，讀取後再更新各卡片進度
+  list.forEach(m => {
+    const c = Store.get(m.id); if (!c) return;
+    Store.filesOf(m.id).then(files => {
+      const pr = progressOf(c, files), bar = $(`[data-prog-bar="${m.id}"]`), txt = $(`[data-prog-txt="${m.id}"]`);
+      if (bar) bar.style.width = pr.pct + '%'; if (txt) txt.textContent = `${pr.done}/${pr.total}`;
+    }).catch(() => {});
+  });
   $('#btnNew').onclick = () => {
     const name = prompt('申請案名稱（例如車號或機具型號）：', '申請案 ' + new Date().toLocaleDateString('zh-TW'));
     if (name === null) return;

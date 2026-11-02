@@ -54,7 +54,8 @@ const Drawings = (() => {
   function valuesOf(c) {
     const EV = Calc.effective(c).vals, n = Calc.num, mm = (v) => n(v) > 0 ? n(v) * 10 : NaN;
     const bs = c && c.id && typeof Store !== 'undefined' ? Store.subGet(c.id, 'boomStrengthCalc.v1') : null;
-    const rOff = bs && bs.design && isFinite(n(bs.design.rOff)) ? n(bs.design.rOff) : A_DEFAULT_M;
+    // 資料庫原廠機型（不由半徑反算伸臂角）之 a 為 0，非實際尺寸：≦ 0 或未建立 S3 時一律用預設 0.2 m
+    const rOff = bs && bs.design && n(bs.design.rOff) > 0 ? n(bs.design.rOff) : A_DEFAULT_M;
     return { front: mm(c.stab.Lw), side: mm(EV.S), B1: mm(EV.B1), B2: mm(EV.B2), H: mm(c.vehicle.wheelbase_cm), h: mm(c.vehicle.height_cm), a: rOff * 1000 };
   }
   /* 回傳 JPEG dataURL；v 為 valuesOf() 之結果（相容舊呼叫：傳入單一數值時只標主要尺寸） */
