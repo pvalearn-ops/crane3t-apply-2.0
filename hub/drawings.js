@@ -44,6 +44,7 @@ const Drawings = (() => {
     g.font = `bold ${size}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'top';
     const tw = g.measureText(txt).width, m = Math.min(W - tw / 2 - 20, Math.max(tw / 2 + 20, mid != null ? mid : (x1 + x2) / 2));
     g.fillText(txt, m, y + 40);
+    return { x: m - tw / 2, y: y + 34, w: tw, h: size * 1.3 };   // 文字範圍（供點選連結）
   }
   const mmTxt = (mm) => isFinite(mm) && mm > 0 ? Math.round(mm).toLocaleString('en-US') + ' mm' : '（未填）';
 
@@ -59,7 +60,10 @@ const Drawings = (() => {
     return { front: mm(c.stab.Lw), side: mm(EV.S), B1: mm(EV.B1), B2: mm(EV.B2), H: mm(c.vehicle.wheelbase_cm), h: mm(c.vehicle.height_cm), a: rOff * 1000 };
   }
   /* 回傳 JPEG dataURL；v 為 valuesOf() 之結果（相容舊呼叫：傳入單一數值時只標主要尺寸） */
-  async function render(kind, v) {
+  async function render(kind, v) { return (await draw(kind, v)).url; }
+  /* 同 render，另回傳各尺寸文字之位置 spots（key：Lw、B1、B2、H、S、a、h；座標為畫布像素）與畫布大小，供頁面加上點選連結 */
+  async function draw(kind, v) {
+    const spots = [];
     if (typeof v !== 'object' || v == null) v = { [kind]: v };
     const img = await load(kind), A = ANCHOR[kind];
     const W = img.naturalWidth, H = img.naturalHeight;
@@ -72,23 +76,25 @@ const Drawings = (() => {
       const [ax] = A.a, [bx] = A.b, y1 = H + 60;
       // 外伸撐座全伸寬度（圖下方）
       centerLine(g, ax, A.top, y1 + 30); centerLine(g, bx, A.top, y1 + 30);
-      dimH(g, CW, ax, bx, y1, `${TITLE.front}　${mmTxt(v.front)}`, 62);
+      spots.push({ key: 'Lw', ...dimH(g, CW, ax, bx, y1, `${TITLE.front}　${mmTxt(v.front)}`, 62) });
       // 輪距：兩輪胎中心距（輪胎下方），文字標示前、後輪距
       const yt = A.tireY + 62;
       centerLine(g, A.tireL, A.tireY - 170, yt + 26); centerLine(g, A.tireR, A.tireY - 170, yt + 26);
       g.beginPath(); g.moveTo(A.tireL, yt); g.lineTo(A.tireR, yt); g.stroke();
       arrow(g, A.tireL, yt, -1); arrow(g, A.tireR, yt, 1);
       g.font = `bold 46px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'top';
-      g.fillText(`前輪距 ${mmTxt(v.B1)}／後輪距 ${mmTxt(v.B2)}`, (A.tireL + A.tireR) / 2, yt + 34);
+      const t1 = `前輪距 ${mmTxt(v.B1)}`, t2 = `／後輪距 ${mmTxt(v.B2)}`, w1 = g.measureText(t1).width, w2 = g.measureText(t2).width, x0 = (A.tireL + A.tireR) / 2 - (w1 + w2) / 2;
+      g.fillText(t1 + t2, (A.tireL + A.tireR) / 2, yt + 34);
+      spots.push({ key: 'B1', x: x0, y: yt + 28, w: w1, h: 60 }, { key: 'B2', x: x0 + w1, y: yt + 28, w: w2, h: 60 });
     } else {
       const [ax, ay] = A.a, [bx] = A.b, [rx, ry] = A.rear, y1 = H + 60, y2 = H + 200;
       cross(g, ax, ay); cross(g, rx, ry);
       // 第 1 排：軸距（前輪中心至後輪中心）；文字置於旋轉中心與後輪之間，避開尺寸界線
       centerLine(g, ax, ay - 140, y2 + 30); centerLine(g, rx, ry - 140, y1 + 30);
-      dimH(g, CW, ax, rx, y1, `軸距　${mmTxt(v.H)}`, 56, (bx + rx) / 2);
+      spots.push({ key: 'H', ...dimH(g, CW, ax, rx, y1, `軸距　${mmTxt(v.H)}`, 56, (bx + rx) / 2) });
       // 第 2 排：前輪中心至旋轉中心距離
       centerLine(g, bx, A.top, y2 + 30);
-      dimH(g, CW, ax, bx, y2, `${TITLE.side}　${mmTxt(v.side)}`, 62);
+      spots.push({ key: 'S', ...dimH(g, CW, ax, bx, y2, `${TITLE.side}　${mmTxt(v.side)}`, 62) });
       // 伸臂軸心（腳銷）至旋轉中心距離 a：標於伸臂上方空白處；間距窄，箭頭由外側指入
       const [px, py] = A.pin, ya = 545;
       cross(g, px, py);
@@ -96,7 +102,9 @@ const Drawings = (() => {
       g.beginPath(); g.moveTo(px - 90, ya); g.lineTo(bx + 90, ya); g.stroke();
       arrow(g, px, ya, 1); arrow(g, bx, ya, -1);
       g.font = `bold 52px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'bottom';
-      g.fillText(`伸臂軸心至旋轉中心距離　${isFinite(v.a) ? Math.round(v.a).toLocaleString('en-US') + ' mm' : '（未填）'}`, (px + bx) / 2 + 120, ya - 40);
+      const ta = `伸臂軸心至旋轉中心距離　${isFinite(v.a) ? Math.round(v.a).toLocaleString('en-US') + ' mm' : '（未填）'}`, wa = g.measureText(ta).width;
+      g.fillText(ta, (px + bx) / 2 + 120, ya - 40);
+      spots.push({ key: 'a', x: (px + bx) / 2 + 120 - wa / 2, y: ya - 40 - 66, w: wa, h: 70 });
       // 車高：地面至車輛最高點（右側垂直尺寸）
       const xd = W + 120;
       g.lineWidth = 3;
@@ -107,9 +115,11 @@ const Drawings = (() => {
       arrowV(g, xd, A.topY, -1); arrowV(g, xd, A.ground, 1);
       g.save(); g.translate(xd + 70, (A.topY + A.ground) / 2); g.rotate(-Math.PI / 2);
       g.font = `bold 56px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(`車高　${mmTxt(v.h)}`, 0, 0); g.restore();
+      const th = `車高　${mmTxt(v.h)}`, wh = g.measureText(th).width;
+      g.fillText(th, 0, 0); g.restore();
+      spots.push({ key: 'h', x: xd + 70 - 36, y: (A.topY + A.ground) / 2 - wh / 2, w: 72, h: wh });
     }
-    return cv.toDataURL('image/jpeg', 0.9);
+    return { url: cv.toDataURL('image/jpeg', 0.9), spots, w: cv.width, h: cv.height };
   }
-  return { render, valuesOf, TITLE };
+  return { render, draw, valuesOf, TITLE };
 })();

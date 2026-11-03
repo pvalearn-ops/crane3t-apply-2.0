@@ -182,7 +182,7 @@ function bindEvents() {
   // 頂部輸入框
   inputDocTitle.addEventListener("input", (e) => { state.docTitle = e.target.value; saveToStorage(); });
   inputUnit.addEventListener("input", (e) => { state.unit = e.target.value; saveToStorage(); });
-  inputNotes.addEventListener("input", (e) => { state.notes = e.target.value; saveToStorage(); });
+  inputNotes.addEventListener("input", (e) => { state.notes = e.target.value; syncNotesPrint(); saveToStorage(); });
 
   // 控制按鈕
   document.getElementById("btnAddCol").addEventListener("click", addBoomColumn);
@@ -232,6 +232,7 @@ function renderAll() {
   inputDocTitle.value = state.docTitle || "吊升荷重表";
   inputUnit.value = state.unit || "kg";
   inputNotes.value = state.notes || "";
+  syncNotesPrint();
 
   renderBoomHeaders();
   renderTableBody();
@@ -615,4 +616,10 @@ function escapeHtml(text) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+/* 列印用備註：輸入框無法換行，列印時改顯示可自動換行之文字 */
+function syncNotesPrint() {
+  const p = document.getElementById("notesPrint");
+  if (p) p.textContent = state.notes || "";
 }

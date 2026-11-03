@@ -155,6 +155,8 @@ body.preview #pvbar{display:flex;position:fixed;top:0;left:0;right:0;z-index:9;b
 .sheet th,.sheet td{border:.6pt solid #444;padding:.6mm 1.4mm;font-size:8.5pt;color:#000}
 .sheet th{background:#e9edf2}
 .sheet td.na{background:#e2e2e2}
+.sheet .lc td.stab{background:#d9d9d9;font-style:italic;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet .lc td.dead{color:#b91c1c;font-weight:700}
 .sheet .lc td.x{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cline x1='0' y1='0' x2='100' y2='100' stroke='%23333' stroke-width='1.4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center/100% 100% no-repeat}
 .sheet.land th,.sheet.land td{font-size:7.6pt;padding:.25mm 1mm;line-height:1.25}
 .sheet td.ng{background:#f6d5d1;color:#000}
@@ -902,6 +904,24 @@ function chartRadii() {
   for (let r = Math.max(4, Math.ceil(lo)); r <= hi + 1e-9; r += 1) out.push(r);
   return out;
 }
+/* 附錄吊升荷重表：主控台已產生新荷重表（S4 最終結果，即申請文件「荷重表（新）」）時，直接採用其內容與注意事項，兩者一致 */
+function finalChartHTML() {
+  let L = null; try { L = window.CASE_ID ? JSON.parse(localStorage.getItem('crane_load_chart_data')) : null; } catch (e) {}
+  if (!L || !Array.isArray(L.booms) || !L.booms.length || !Array.isArray(L.cells)) return '';
+  const cellHTML = (x) => {
+    if (!x) return '<td></td>';
+    if (x.isSlash) return '<td class="x"></td>';
+    const [main, ...rest] = String(x.text || '').split(String.fromCharCode(10));
+    return `<td class="${x.stab ? 'stab' : ''}${x.dead ? ' dead' : ''}">${esc(main)}${rest.length ? `<small>${esc(rest.join(' '))}</small>` : ''}</td>`;
+  };
+  let h = `<div class="lc-title"><b>${esc(L.docTitle || '吊升荷重表')}</b><span>單位：<b>${esc(L.unit || 'kg')}</b></span></div>
+  <table class="lc"><thead><tr><th class="corner" rowspan="2"><span class="a">吊桿長度 (m)</span><span class="b">作業半徑 (m)</span></th><th colspan="${L.booms.length}">吊桿長度（m）</th></tr>
+  <tr>${L.booms.map(b => `<th>${esc(b)}</th>`).join('')}</tr></thead><tbody>`;
+  (L.radiuses || []).forEach((r, i) => { h += `<tr><td class="r">${esc(r)}</td>${L.booms.map((_, j) => cellHTML((L.cells[i] || [])[j])).join('')}</tr>`; });
+  h += '</tbody></table>';
+  if (L.notes) h += `<p style="font-weight:700;margin-top:8px;white-space:pre-wrap">注意：${esc(L.notes)}</p>`;
+  return h;
+}
 function loadChartHTML() {
   const rows = chartRadii();
   const cols = S.stages.map((st, s) => s).filter(s => isNum(S.stages[s].len)).sort((a, b) => S.stages[a].len - S.stages[b].len);
@@ -1238,6 +1258,16 @@ function windTableHTML(C) {
   return o;
 }
 function buildPrint() {
+  if (S.src === 'oemdoc') {   // 已有原廠計算：只套印封面
+    const c = hubCase(), P = S.project, title = (c && c.crane && c.crane.type) || P.title || '積載型起重機', model = (c && c.crane && c.crane.model) || P.model || '';
+    $('#print').innerHTML = `<div class="sheet"><div class="ph"><span>${esc(title)}　MODEL：${esc(model)}</span><span>伸臂強度計算書</span></div>
+      <div class="cover"><div class="t1">伸臂強度計算書</div><div class="t2">STRENGTH CALCULATION SHEET FOR BOOM</div>
+      <div class="t2" style="margin-top:18mm">${esc(title)}</div><div class="t2">MODEL：${esc(model)}</div>
+      <div class="t2" style="font-size:12pt;margin-top:16mm">依原廠伸臂強度計算書（另附）</div>
+      <div class="t2" style="font-size:10.5pt;margin-top:20mm">日期：${esc(P.date)}</div></div></div>`;
+    $('#pageStyle').textContent = '@page{size:A4 portrait;margin:12mm 12mm 14mm}';
+    return;
+  }
   const C = compute(), d = S.design, P = S.project, N = S.booms.length, sa = sigA();
   const ph = (t) => `<div class="ph"><span>${esc(P.title)}　MODEL：${esc(P.model)}</span><span>${t}</span></div>`;
   let o = '';
@@ -1386,7 +1416,7 @@ function buildPrint() {
       o += `<div class="sheet">${ph('6. 計算明細')}<h2>6. 各斷面最不利性能計算明細 — 斷面 ${secName(k)}（${caseTxt(m.gov)}）</h2><div class="formula">${detailHTML(C, m.gov.s, m.gov.r, k)}</div></div>`;
     });
   }
-  o += `<div class="sheet">${ph('附錄　吊升荷重表')}<h2>附錄　吊升荷重表</h2>${loadChartHTML()}<p style="font-weight:700;margin-top:8px">註：本表重量為額定總荷重（含吊鉤自重）。</p></div>`;
+  o += `<div class="sheet">${ph('附錄　吊升荷重表')}<h2>附錄　吊升荷重表</h2>${finalChartHTML() || loadChartHTML() + '<p style="font-weight:700;margin-top:8px">注意：本表重量為額定總荷重（含吊鉤自重）。</p>'}</div>`;
   $('#print').innerHTML = o;
   $('#pageStyle').textContent = `@page{size:A4 portrait;margin:12mm 12mm 14mm;@bottom-center{content:"第 " counter(page) " 頁 / 共 " counter(pages) " 頁";font-size:8pt}}
     @page land{size:A4 landscape;margin:9mm 10mm 11mm}`;
@@ -1474,9 +1504,20 @@ function loadChartFromHub() {
 }
 
 /* ---------------- STEP 1：選擇機具 ---------------- */
+/* 資料庫原廠計算：須與主控台 S1 起重機型號（或資料庫型號）相同才可選用；未由主控台開啟時不限制 */
+const normModel = (x) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function dbAllowed(id) {
+  if (!window.CASE_ID) return true;
+  const c = hubCase(); if (!c || !c.crane) return false;
+  return [c.crane.dbModel, c.crane.model].map(normModel).includes(normModel(id));
+}
 function renderStep1() {
   const card = (id) => {
     const M = MACHINES[id], m = M.data();
+    if (!dbAllowed(id)) { const c = hubCase(); return `<div class="card" style="opacity:.55"><h3>${M.brand} ${M.model}</h3>
+      <div><span class="tag">資料庫</span><span class="tag">原廠計算書 ${esc(M.doc)}</span></div>
+      <div class="note" style="color:#b91c1c">與 S1 起重機型號（${esc((c && c.crane && (c.crane.dbModel || c.crane.model)) || '未填')}）不符，不能選用。</div>
+      <button class="pri" disabled>不能選用</button></div>`; }
     const lens = m.stages.map(s => s.len), maxW = Math.max(...m.stages.flatMap(s => s.rows.map(r => r[0])));
     return `<div class="card"><h3>${M.brand} ${M.model}</h3>
       <div><span class="tag">資料庫</span><span class="tag">原廠計算書 ${esc(M.doc)}</span></div>
@@ -1492,9 +1533,29 @@ function renderStep1() {
       <div class="spec">重心位置依各伸臂長度自動推算（以旋轉中心為基準點之各部位置 × 伸出比例）；斷面尺寸、重量、荷重表等其他數值由使用者填寫。</div>
       <div class="f"><label>起始資料</label><select id="selfTpl"><option value="">空白（5 節）</option>${Object.keys(MACHINES).map(id => `<option value="${id}">以 ${MACHINES[id].model} 數據為範本</option>`).join('')}</select></div>
       <button class="pri" data-act="self">開始自行計算 →</button></div>
+    <div class="card"><h3>已有原廠計算</h3>
+      <div><span class="tag">原廠伸臂強度計算書</span></div>
+      <div class="spec">已有原廠伸臂強度計算書者，本系統不另行計算伸臂強度；S4 只檢核安定度，申請文件之伸臂強度計算書只套印封面（原廠計算書另附）。</div>
+      <div class="note">安定度計算所需之伸臂各節重量、油壓缸重量，仍須於本頁輸入。</div>
+      <button class="pri" data-act="oemdoc">選用：已有原廠計算 →</button></div>
     ${Object.keys(MACHINES).map(card).join('')}
   </div>
-  ${S.src ? `<div class="card" style="margin-top:14px"><b>目前資料：</b>${isDb() ? '資料庫 ' + esc(S.project.model) : '自行計算 ' + esc(S.project.model || '')}　<button data-act="resume">繼續目前資料 →</button> <span class="note">重新選擇將覆蓋目前輸入（可先「儲存資料檔」）。</span></div>` : ''}`;
+  ${S.src ? `<div class="card" style="margin-top:14px"><b>目前資料：</b>${S.src === 'oemdoc' ? '已有原廠計算' : isDb() ? '資料庫 ' + esc(S.project.model) : '自行計算 ' + esc(S.project.model || '')}　<button data-act="resume">繼續目前資料 →</button> <span class="note">重新選擇將覆蓋目前輸入（可先「儲存資料檔」）。</span></div>` : ''}`;
+}
+/* 已有原廠計算：不計算伸臂強度（強度上限不限制），重量由主控台 S3 輸入 */
+function startOemDoc() {
+  const c = hubCase(), n = Math.max(1, ((c && c.boom && c.boom.stages_m) || []).filter(x => Number(x) > 0).length || S.booms.length || 5);
+  S = newState(dataBlank(n), 'oemdoc', 'est', (c && c.crane && c.crane.model) || '');
+  S.step = 2;
+  if (c && c.crane) S.project.title = c.crane.type || S.project.title;
+}
+function renderOemDoc() {
+  document.body.classList.add('s1'); document.body.classList.remove('s2');
+  $('#hdrInfo').textContent = '';
+  $('#step1').innerHTML = `<h2>已有原廠計算</h2><div class="card"><p>本案伸臂強度依<b>原廠伸臂強度計算書</b>，本系統不另行計算；S4 荷重表反算只檢核安定度。</p>
+    <p class="note">伸臂各節重量、油壓缸重量（安定度計算用）請於主控台 S3 頁面輸入。申請文件之伸臂強度計算書只套印封面。</p>
+    <button data-act="toStep1">← 重新選擇計算方式</button></div>`;
+  saveResult('oemdoc');
 }
 function srcBannerHTML() {
   return isDb()
@@ -1506,7 +1567,8 @@ function renderAll() {
   document.body.classList.toggle('s1', !s2);
   document.body.classList.toggle('s2', !!s2);
   document.querySelectorAll('nav a.st').forEach(a => a.classList.toggle('on', +a.dataset.step === (s2 ? 2 : 1)));
-  if (!s2) { renderStep1(); $('#hdrInfo').textContent = ''; saveResult(null); return; }
+  if (!s2) { renderStep1(); $('#hdrInfo').textContent = ''; if (!S.src) saveResult(null); return; }   // 停在 STEP 1 時保留既有計算結果
+  if (S.src === 'oemdoc') { renderOemDoc(); return; }
   syncROff();
   $('#srcBanner').innerHTML = srcBannerHTML();
   renderDesign(); renderChart(); renderSections(); renderGeo(); renderDetailShell();
@@ -1558,6 +1620,7 @@ document.addEventListener('click', e => {
     case 'resume': S.step = 2; break;
     case 'fromHub': loadChartFromHub(); break;
     case 'toStep1': S.step = 1; window.scrollTo(0, 0); break;
+    case 'oemdoc': if (S.src && S.src !== 'oemdoc' && !confirm('改為「已有原廠計算」將覆蓋目前伸臂強度計算資料（可先「儲存資料檔」）。確定？')) return; startOemDoc(); break;
     case 'nInc': setN(S.booms.length + 1); break;
     case 'nDec': if (S.booms.length <= 1) return; if (!confirm(`確定要刪除 ${boomName(S.booms.length - 1)}（斷面 ${secName(S.booms.length - 1)}）及最後一段伸臂長度的資料嗎？`)) return; setN(S.booms.length - 1); break;
     case 'rowAdd': { const rs = S.stages[s].rows; rs.push(rs.length ? [...rs[rs.length - 1]] : [1000, 3, 60]); break; }
@@ -1610,9 +1673,10 @@ function saveResult(C) {
   if (!window.CASE_ID) return;
   clearTimeout(resTmr);
   resTmr = setTimeout(() => {
-    const lim = C && S.src ? strengthLimits(C) : null;
+    const oem = C === 'oemdoc';
+    const lim = oem ? { none: true } : C && S.src ? strengthLimits(C) : null;
     const lv = JSON.stringify(lim);
-    const v = JSON.stringify(C && S.src ? { has: true, valid: !!lim, ok: !!C.ok, maxU: isFinite(C.maxU) ? +C.maxU.toFixed(3) : null, errs: C.errs.length, src: S.src, model: S.project.model || '', lens: S.stages.map(st => st.len) } : { has: false, valid: false, ok: false });
+    const v = JSON.stringify(oem ? { has: true, valid: true, ok: true, src: 'oemdoc', model: S.project.model || '' } : C && S.src ? { has: true, valid: !!lim, ok: !!C.ok, maxU: isFinite(C.maxU) ? +C.maxU.toFixed(3) : null, errs: C.errs.length, src: S.src, model: S.project.model || '', lens: S.stages.map(st => st.len) } : { has: false, valid: false, ok: false });
     try {
       if (localStorage.getItem('boomStrength_limits') !== lv) localStorage.setItem('boomStrength_limits', lv);
       if (localStorage.getItem('boomStrength_result') !== v) localStorage.setItem('boomStrength_result', v);
@@ -1669,6 +1733,7 @@ function applySeed() {
   if (!window.CASE_ID) return;
   let sd = null; try { sd = JSON.parse(localStorage.getItem('boomStrength_seed')); } catch (e) {}
   if (!sd || !sd.id || sd.id === S.seedId) return;
+  if (S.src === 'oemdoc') { S.seedId = sd.id; save(); return; }   // 已有原廠計算：不套用起始資料
   if (sd.machine && MACHINES[sd.machine]) pickMachine(sd.machine);
   else if (sd.stages && sd.stages.length && S.src === 'self') mergeSelf(sd);
   else if (sd.stages && sd.stages.length) seedSelf(sd);
@@ -1679,6 +1744,7 @@ function applySeed() {
   save();
 }
 applySeed();
+if (EMBED && S.src !== 'oemdoc') S.step = 1;   // 主控台 S3：一律從 STEP 1（選擇機具）開始
 syncSecFromHub();
 const hm = location.hash.match(/^#(URA506WY)/);   // 例：#URA506WY 直接開啟該機具（供外部系統連結）
 if (hm) pickMachine(hm[1]);

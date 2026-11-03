@@ -690,7 +690,13 @@ body {
     font-size: 9.5pt !important;
     border: none !important;
   }
+
+  /* 備註改用可換行之文字列印（輸入框為單行，長句會被截斷） */
+  .notes-container { align-items: flex-start !important; }
+  .notes-container .editable-notes { display: none !important; }
+  .notes-print { display: block !important; flex: 1 1 auto; min-width: 0; white-space: pre-wrap; word-break: break-word; font-size: 9.5pt; font-weight: 700; }
 }
+.notes-print { display: none; }
 
 /* 受限制區與未受限制區之分隔粗線 */
 .load-table td.cap-b { border-bottom: 3px solid #000 !important; }

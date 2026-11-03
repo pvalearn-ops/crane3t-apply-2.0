@@ -214,7 +214,8 @@ const Calc = (() => {
     const { P, lengths, stagesM, miss, warn } = collect(c);
     const SL = strengthOf(c);
     if (!SL) miss.push('S3 伸臂強度計算（尚未完成或輸入有誤）');
-    const strAt = SL ? strengthLookup(SL, stagesM, miss) : null;
+    // SL.none：已有原廠伸臂強度計算書，不以伸臂強度限制荷重（強度上限視為無限大）
+    const strAt = SL ? (SL.none ? () => Infinity : strengthLookup(SL, stagesM, miss)) : null;
     if (miss.length) return { ok: false, miss, warn };
     const bw = boomWeights(c, lengths);
     const origCapKg = num(c.crane.orig_capacity_t) * 1000;
