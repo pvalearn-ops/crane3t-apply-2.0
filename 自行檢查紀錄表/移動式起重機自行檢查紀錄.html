@@ -609,6 +609,8 @@
       margin-top: 2px !important;
     }
   }
+  /* 簽章欄日期：印出後手寫之空白線（非輸入欄位） */
+  .date-blank { display: inline-block; min-width: 150px; padding: 0 6px 1px; border-bottom: 1px solid #000; text-align: right; letter-spacing: 1px; color: #555; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -2099,19 +2101,19 @@
           <td>
             <div style="display: flex; align-items: center; gap: 4px;">
               <span style="font-weight: 600; white-space: nowrap;">檢查日期：</span>
-              <input type="text" class="inline-input w-num-lg" id="inspector_date" placeholder="年   月   日">
+              <span class="date-blank" title="印出後手寫">年　　　月　　　日</span>
             </div>
           </td>
           <td>
             <div style="display: flex; align-items: center; gap: 4px;">
               <span style="font-weight: 600; white-space: nowrap;">檢查日期：</span>
-              <input type="text" class="inline-input w-num-lg" id="unit_date" placeholder="年   月   日">
+              <span class="date-blank" title="印出後手寫">年　　　月　　　日</span>
             </div>
           </td>
           <td>
             <div style="display: flex; align-items: center; gap: 4px;">
               <span style="font-weight: 600; white-space: nowrap;">日期：</span>
-              <input type="text" class="inline-input w-num-lg" id="owner_date" placeholder="年   月   日">
+              <span class="date-blank" title="印出後手寫">年　　　月　　　日</span>
             </div>
           </td>
         </tr>
@@ -2233,9 +2235,7 @@
     setValue('inspection_unit_sign', '中華起重升降安全檢驗協會');
     setValue('owner_unit_sign', '台灣重工機械 (股) 公司');
 
-    setValue('inspector_date', dateStr);
-    setValue('unit_date', dateStr);
-    setValue('owner_date', dateStr);
+    // 簽章欄日期留白（印出後手寫）
 
     showToast('已填入範例資料');
     triggerAutoSave();
@@ -2421,17 +2421,8 @@
         applyFormData(JSON.parse(saved));
         showToast('已自動恢復上次填寫草稿');
       } catch (e) {}
-    } else {
-      // 填寫今日日期
-      const today = new Date();
-      const rocYear = today.getFullYear() - 1911;
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      const dateStr = `${rocYear} 年 ${month} 月 ${day} 日`;
-      setValue('inspector_date', dateStr);
-      setValue('unit_date', dateStr);
-      setValue('owner_date', dateStr);
     }
+    // 簽章欄之三個日期為印出後手寫之空白線，不提供輸入
   });
 </script>
 <script src="result-toggle.js?v=20261006a"></script>

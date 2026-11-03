@@ -299,3 +299,6 @@ textarea.mono { width: 100%; min-height: 140px; font-family: Consolas, monospace
 .flash-field { animation: flashField 1.3s ease-in-out 2; }
 /* 頁首版本號 */
 .app-ver { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 10px; background: #e0e7ff; color: #3730a3; font-size: .75rem; font-weight: 600; vertical-align: middle; }
+/* 尚缺提醒之欄位連結 */
+.miss-link { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.miss-link:hover { color: #1d4ed8; }

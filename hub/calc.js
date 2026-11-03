@@ -173,9 +173,9 @@ const Calc = (() => {
       Wb: V.Wb, Wf: V.Wf, Wh: V.Wh, B1: V.B1, B2: V.B2, H: num(c.vehicle.wheelbase_cm),
       Lw: num(c.stab.Lw), thetaM: V.thetaM, S: V.S, h1: V.h1, h2: V.h2, h3: V.h3, h4: V.h4, lengths, _used: E.used
     };
-    const need = { Wb: '起重機總重量 Wb', Wh: '吊具組重量 Wh', Lw: '外伸撐座全伸寬度 Lw', thetaM: '伸臂最大起伏角 θm' };
+    const need = { Wb: '空重（含起重機）', Wh: '吊具組（吊鉤）重量 Wh', Lw: '外伸撐座全伸寬度 Lw', thetaM: '伸臂最大起伏角 θm' };   // 與輸入欄位名稱一致
     for (const [k, label] of Object.entries(need)) if (!isFinite(P[k])) miss.push(label);
-    if (!lengths.length) miss.push('伸臂各段伸出長度');
+    if (!lengths.length) miss.push('伸臂各段長度');
     for (let i = 1; i < lengths.length; i++) if (lengths[i] <= lengths[i - 1]) warn.push('伸臂長度必須由短到長遞增（第 ' + (i + 1) + ' 段）。');
     return { P, lengths, stagesM, miss, warn };
   }

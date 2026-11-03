@@ -52,7 +52,7 @@ const SUBPAGES = {
   'doc-selfcheck': { title: '9. 自行檢查紀錄', src: '自行檢查紀錄表/移動式起重機自行檢查紀錄.html', tip: '表頭與規格已帶入；請依實際檢查結果點選「結果」欄（按一下 V，再按一下 /）。' }
 };
 const STEP_PAGES = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
-const SUB_VER = '20261103h';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）；亦顯示於頁首供確認目前版本
+const SUB_VER = '20261103j';   // 子頁面版本（更新子頁面後調整，避免瀏覽器使用舊快取）；亦顯示於頁首供確認目前版本
 { const v = document.getElementById('appVer'); if (v) { v.textContent = '版本 ' + SUB_VER.replace(/^(\d{4})(\d{2})(\d{2})(\w*)$/, '$1.$2.$3$4'); v.title = '目前網頁版本；更新後請重新整理（Ctrl＋F5）以載入最新版'; } }
 
 /* ---------------- 路徑工具 ---------------- */
@@ -340,25 +340,25 @@ const PILL = { done: '<span class="pill done">完成</span>', part: '<span class
    申請案工作區
    ============================================================ */
 const S5_REQ = { 'docs.rope_d': '鋼索直徑', 'docs.rope_n': '鋼索掛數', 'docs.hook_d': '吊鉤開口直徑 d',
-  'docs.hook_B1': '吊鉤 B1', 'docs.hook_b1': '吊鉤 b1', 'docs.hook_h1': '吊鉤 h1', 'docs.hook_B2': '吊鉤 B2', 'docs.hook_b2': '吊鉤 b2', 'docs.hook_h2': '吊鉤 h2' };
+  'docs.hook_B1': '第 I 剖面 B1', 'docs.hook_b1': '第 I 剖面 b1', 'docs.hook_h1': '第 I 剖面 h1', 'docs.hook_B2': '第 II 剖面 B2', 'docs.hook_b2': '第 II 剖面 b2', 'docs.hook_h2': '第 II 剖面 h2' };
 /* S2 尚缺項目（S3 伸臂強度屬下一步，不列入） */
 function s2Missing(c) {
   const m = [];
-  if (!c.company.name) m.push('S2-1 事業單位名稱');
-  if (!c.site.county) m.push('S2-1 設置地址或受檢地點（縣市）');
-  if (!c.vehicle.plate) m.push('S2-2 車牌號碼');
-  [['front_track_cm', '前輪距'], ['rear_track_cm', '後輪距'], ['height_cm', '車高']].forEach(([k, l]) => { if (!(N(c.vehicle[k]) > 0)) m.push('S2-2 ' + l); });
-  if (c.hasChart !== true && c.hasChart !== false) m.push('S1 機型或荷重性能表來源');
+  if (!c.company.name) m.push('事業單位名稱');
+  if (!c.site.county) m.push('設置地址或受檢地點');
+  if (!c.vehicle.plate) m.push('車牌號碼');
+  [['front_track_cm', '前輪距'], ['rear_track_cm', '後輪距'], ['height_cm', '車高']].forEach(([k, l]) => { if (!(N(c.vehicle[k]) > 0)) m.push(l); });
+  if (c.hasChart !== true && c.hasChart !== false) m.push('機型或荷重性能表來源');
   else (Calc.compute(c).miss || []).filter(x => !/^S3/.test(x)).forEach(x => m.push(x));
   return Array.from(new Set(m));
 }
 function refreshS2Miss(pane) {
   const mb = $('#s2Miss', pane); if (!mb) return; const ms = s2Missing(cur);
-  mb.className = 'callout ' + (ms.length ? 'warn' : 'ok'); mb.innerHTML = ms.length ? '<b>S2 尚缺：</b>' + esc(ms.join('、')) : 'S2 必填資料已完成。';
+  mb.className = 'callout ' + (ms.length ? 'warn' : 'ok'); mb.innerHTML = ms.length ? '<b>S2 尚缺：</b>' + missLinks(ms) : 'S2 必填資料已完成。';
 }
 function s4Missing(c) {
   const m = Object.entries(S5_REQ).filter(([p]) => { const v = getP(c, p); return v === '' || v == null; }).map(x => x[1]);
-  if (!c.docs.rope_nocert && !(N(c.docs.rope_pbreak) > 0)) m.splice(2, 0, '鋼索標準破斷荷重');
+  if (!c.docs.rope_nocert && !(N(c.docs.rope_pbreak) > 0)) m.splice(2, 0, '標準破斷荷重');
   return m;
 }
 function s5Missing(c, files) {
@@ -460,6 +460,35 @@ function renderCase(page) {
   window.scrollTo(0, 0);
   focusFromHash();
 }
+/* 「尚缺」提醒：項目名稱與輸入欄位名稱一致，並連結到該欄位（點選後前往、聚焦並閃爍提示） */
+function missTarget(t) {
+  const c = cur, v = (k) => ['step2', `[data-k="vehicle.${k}"]`];
+  const S5 = Object.entries(S5_REQ).find(([, l]) => l === t);
+  if (S5) return ['step5', `[data-k="${S5[0]}"]`];
+  const slot = S6_SLOTS.find(k => SLOTS[k].label === t);
+  if (slot) return ['step6', `[data-slot="${slot}"]`];
+  const M = [
+    [/^事業單位名稱$/, ['step2', '[data-k="company.name"]']],
+    [/^設置地址或受檢地點/, ['step2', '[data-addr="site"] [data-part="county"]']],
+    [/^車牌號碼$/, v('plate')], [/^前輪距$/, v('front_track_cm')], [/^後輪距$/, v('rear_track_cm')], [/^車高$/, v('height_cm')],
+    [/^空重（含起重機）$/, v('empty_weight_kg')],
+    [/^吊具組（吊鉤）重量 Wh$/, c && c.hasChart === false ? ['step1', '[data-k="stab.Wh"]'] : ['step2', '[data-stab="Wh"]']],
+    [/^外伸撐座全伸寬度 Lw$/, ['step2', '[data-k="stab.Lw"]']],
+    [/^伸臂最大起伏角 θm$/, ['step2', '[data-stab="thetaM"]']],
+    [/^標準破斷荷重$/, ['step5', '[data-k="docs.rope_pbreak"]']],
+    [/伸臂各段長度|原廠荷重表伸臂長度/, ['step1', '#chartEditor, .stage-list']],
+    [/^機型或荷重性能表來源$/, ['step1', null]],
+    [/^S3/, ['step3', null]]
+  ];
+  const hit = M.find(([re]) => re.test(t));
+  return hit ? hit[1] : null;
+}
+function missLinks(list) {
+  return list.map(t => {
+    const T = missTarget(t);
+    return T && cur ? `<a class="miss-link" href="#case=${cur.id}&p=${T[0]}${T[1] ? '&fs=' + encodeURIComponent(T[1]) : ''}">${esc(t)}</a>` : esc(t);
+  }).join('、');
+}
 /* 組配圖尺寸連結 → 對應輸入欄位：[頁面, 欄位選擇器, 說明] */
 const DIM_LINK = {
   Lw: ['step2', '[data-k="stab.Lw"]', '外伸撐座全伸寬度 Lw（S2-6）'],
@@ -472,11 +501,11 @@ const DIM_LINK = {
 };
 /* 網址帶 &f=<尺寸代號> 時：捲到對應欄位、聚焦並閃爍提示，之後移除該參數 */
 function focusFromHash() {
-  const f = new URLSearchParams(location.hash.slice(1)).get('f'); if (!f) return;
-  history.replaceState(null, '', location.href.replace(/&f=[^&]*/, ''));
-  const L = DIM_LINK[f]; if (!L || !L[1]) return;
+  const q = new URLSearchParams(location.hash.slice(1)), f = q.get('f'), fs = q.get('fs'); if (!f && !fs) return;
+  history.replaceState(null, '', location.href.replace(/&fs?=[^&]*/g, ''));
+  const sel = fs || (DIM_LINK[f] && DIM_LINK[f][1]); if (!sel) return;
   setTimeout(() => {
-    const el = $(L[1]); if (!el) return;
+    const el = $(sel); if (!el) return;
     el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true });
     el.classList.add('flash-field'); setTimeout(() => el.classList.remove('flash-field'), 2600);
   }, 200);
@@ -1185,7 +1214,7 @@ function pStep2(pane) {
   const manual = cur.boom.weightMode === 'manual';
   const unitW = secUnitW(cur);
   const est = Calc.estimateBoom(stages.map(N).filter(x => x > 0).map(x => x * 100), N(cur.crane.orig_capacity_t), N(cur.boom.numCyl), unitW);
-  pane.innerHTML = (miss2.length ? `<div class="callout warn" id="s2Miss"><b>S2 尚缺：</b>${esc(miss2.join('、'))}</div>` : '<div class="callout ok" id="s2Miss">S2 必填資料已完成。</div>') + basicCardsHtml() + `
+  pane.innerHTML = (miss2.length ? `<div class="callout warn" id="s2Miss"><b>S2 尚缺：</b>${missLinks(miss2)}</div>` : '<div class="callout ok" id="s2Miss">S2 必填資料已完成。</div>') + basicCardsHtml() + `
   <div class="card">
     <h2>S2-4　搭乘設備</h2>
     <div class="fgrid">
@@ -1389,7 +1418,7 @@ function pStep4(pane) {
   if (!r.ok) {
     flush();
     pane.innerHTML = `<div class="card"><h2>S4　荷重表反算（伸臂強度＋安定度）</h2>
-      <div class="callout danger"><b>尚缺以下資料，無法計算：</b><ul>${r.miss.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div class="callout danger"><b>尚缺以下資料，無法計算（點選前往填寫）：</b><ul>${r.miss.map(x => `<li>${missLinks([x])}</li>`).join('')}</ul></div>
       ${(r.warn || []).length ? `<div class="callout warn"><ul>${r.warn.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
       <div class="btn-row"><a class="btn btn-primary" href="#case=${cur.id}&p=step2">← 回 S2 補齊資料</a><a class="btn btn-outline" href="#case=${cur.id}&p=step3">← 回 S3 伸臂強度計算</a></div></div>`;
     renderNav(); return;
@@ -1648,7 +1677,7 @@ function syncDocs(c) {
   Store.subSet(id, 'crane_form_draft', spec);
 
   // 自行檢查紀錄（檢查結果由使用者在文件上點選）
-  const sc = Store.subGet(id, 'crane_self_inspection_record_draft') || { inputs: { inspector_date: roc(), unit_date: roc(), owner_date: roc() }, checkboxes: {}, results: {} };
+  const sc = Store.subGet(id, 'crane_self_inspection_record_draft') || { inputs: {}, checkboxes: {}, results: {} };   // 簽章欄日期留白，印出後手寫
   sc.inputs = sc.inputs || {};
   const I = (k, v) => { if (ok(v)) sc.inputs[k] = String(v); };
   I('company_name', c.company.name); I('company_address', c.company.address); I('machine_type', craneDesc);
@@ -1703,7 +1732,7 @@ function pStep5(pane) {
   <div class="card">
     <h2>S5　申請文件資料</h2>
     <div class="callout info">這裡集中填寫各份申請文件需要、但 S1～S4 沒有的資料。按左側「套用到申請文件」後，會自動帶入申請書、明細表、鋼索吊鉤計算書與自行檢查紀錄；套用後仍可在各文件上直接修改。
-      ${miss.length ? `<br><b style="color:var(--ng)">尚缺必填：</b>${esc(miss.join('、'))}` : '<br><b style="color:var(--ok)">必填欄位已完成。</b>'}</div>
+      ${miss.length ? `<br><b style="color:var(--ng)">尚缺必填：</b>${missLinks(miss)}` : '<br><b style="color:var(--ok)">必填欄位已完成。</b>'}</div>
   </div>
   <div class="card">
     <h2>S5-1　檢查申請書</h2>
@@ -1839,7 +1868,7 @@ function pStep6(pane) {
   pane.innerHTML = `
   <div class="card">
     <h2>S6　照片與證明文件上傳</h2>
-    <div class="callout ${miss.length ? 'warn' : 'ok'}">${miss.length ? '<b>尚缺：</b>' + esc(miss.join('、')) : '所有必要照片與文件皆已上傳。'}<br>
+    <div class="callout ${miss.length ? 'warn' : 'ok'}">${miss.length ? '<b>尚缺：</b>' + missLinks(miss) : '所有必要照片與文件皆已上傳。'}<br>
       完成 S1～S5 後，按左側「✅ 套用到申請文件」產生各份文件；照片可之後再補，補上後到申請文件檢視即可。</div>
   </div>
   ${uploadSections('all')}`;
